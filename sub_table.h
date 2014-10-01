@@ -43,7 +43,7 @@ static inline table_t *table_build_2(const entry_t *const entry_a, const entry_t
     self->shift_mag = bit_size(self->coef) - 2;
 
     register _t(self->length) loc_a, loc_b;
-    for (;
+    for ( ;
            (loc_a = sub_table_hash(entry_a->key, self->coef, self->shift_mag))
         == (loc_b = sub_table_hash(entry_b->key, self->coef, self->shift_mag)) ;
         self->coef = hash_rand_coef(self->coef)
@@ -62,7 +62,7 @@ static inline void sub_table_cleand_recl(table_t *self) {
     table_recl(self);
 }
 
-static inline void *query_table(table_t *self, register entry_key_t key) {
+static inline void *query_table(register const table_t *const self, register const entry_key_t key) {
     return query_entry(self->slots[sub_table_hash(key, self->coef, self->shift_mag)], key);
 }
 

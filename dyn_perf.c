@@ -76,13 +76,25 @@ void test_dyn_perf(
             }                                           \
         })
 
-#   define test_chain_hash_tbl_del() ({for (index = 0; index < cnt; index++) chain_hash_tbl_del(hash_tbl, keys[index]);})
-
 
     double insert_time  = timed(test_insert);
     double query_time   = timed(test_query);
 
+    typedef struct {unsigned long long tables, entries, slots;} sub_tbl_cnts_t;
+#   define cnt_sub_tables(self) ({                                  \
+        register size_t index;                                      \
+        sub_tbl_cnts_t cnts = {0, 0, 0};   \
+        for (index = 0; index < self->length; index++)              \
+            if (dyn_perf_entry_is_table(self, index))  {            \
+                cnts.tables++;                                      \
+                cnts.entries += self->slots[index].table->cnt;      \
+                cnts.slots   += self->slots[index].table->length;   \
+            }                                                       \
+        cnts; })
+
     table_t *max_sub_tbl = lrgst_sub_table(self);
+    sub_tbl_cnts_t sub_table_cnts = cnt_sub_tables(self);
+
     const struct {
         struct {unsigned long long items, slots;} cnt;
         unsigned long long length, byte_usage;
@@ -125,7 +137,16 @@ void test_dyn_perf(
         ,max.capct.items
     );
     printf(
-        "consumtion: %'llu(bytes) efficiency: %.4f [(poor)0 - (perfect)1])\n"
+        "sub_tables: {cnt: %'llu, entries: %'llu, %.4f%% slots: %'llu, %.4f%%}\n"
+        ,sub_table_cnts.tables
+        ,sub_table_cnts.entries
+        ,sub_table_cnts.entries/(double)self->cnt.items
+        ,sub_table_cnts.slots
+        ,sub_table_cnts.slots/(double)self->length
+    );
+
+    printf(
+        "consumtion: %'llu(bytes) efficiency: %.4f [(poor)0 - (ideal)1])\n"
         ,max.byte_usage
         ,(double)(max.cnt.items * (_s(*keys) + _s(*values))) / max.byte_usage
     );

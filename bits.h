@@ -57,12 +57,12 @@
     //      ^^^^^^^^^^^^^^^^^^^ count the number of ones of a byte
     //                          __builtin_popcount uses unsinged int,
     //                          so when arg is conv the sign isn't extend
-#   define __builtin_popcounts __builtin_popcount
-    //  ^^^^^^^^^^^^^^^^^^^ counts the number of 1s on a short (16 bit intgl) return 0 if 0, 16 if -1
 #else
 #   define __builtin_clzb(x)       __builtin_clzs((unsigned short)(x) | (unsigned short)0xFF00)
 #   define __builtin_ctzb(x)       __builtin_ctzs((unsigned short)(x) | (unsigned short)0xFF00)
+
 #   define __builtin_popcountb     __builtin_popcounts
+
 /************************************************************************************************/
 #endif
 
