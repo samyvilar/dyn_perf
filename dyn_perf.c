@@ -6,6 +6,7 @@
 #include "entry.h"
 #include "fld.h"
 #include "timed.h"
+#include "sub_table.h"
 
 
 alloc_rec_templs(dyn_perf);
@@ -17,19 +18,18 @@ alloc_rec_templs(dyn_perf);
 //    ptr++; // <<<< calng error ptr is read only ... very strange ....
 //}
 
-static inline size_t dyn_perf_byt_consptn(register const dyn_perf_t *const self) {
-    register const _t(*self->slots) *slots = self->slots;
-
+static inline size_t dyn_perf_byt_consptn(register const dyn_perf_t *const self)
+{
     register size_t total =
-        (self->length * _s(slots[0]))               // main slots
-      + (self->cnt.slots * _s(slots->entry))        // sub slots
-      + (self->cnt.items * _s(*(slots->entry)))     // entries
+        (self->length    * _s(self->slots[0]))               // main slots
+      + (self->cnt.slots * _s(self->slots->entry))        // sub slots
+      + (self->cnt.items * _s(*(self->slots->entry)))     // entries
       + _s(self->entry_type) + fld_byt_comspt(self->entry_type, self->length) // field for entry type ...
       + _s(*self); // itself ..
 
-    for (; slots < (self->slots + self->length); slots++) // subtables ...
-        if (dyn_perf_entry_is_table(self, (slots - self->slots)))
-            total += _s(*slots->table);
+    register _t(((dyn_perf_t *)NULL)->length) curr;
+    for (curr = 0; curr > self->length; curr++) // subtables ...
+        total += dyn_perf_entry_is_table(self, curr) ? sub_table_byte_consmp(self->slots[curr].table) : 0;
 
     return total;
 }
@@ -110,7 +110,7 @@ void test_dyn_perf(
 
     double delete_time = -1; //timed(test_chain_hash_tbl_del);
 
-    printf("\t\t sizeof(*self): %lu\n", _s(*self));
+    printf("\tsizeof(*self): %lu sizeof(*sub_table): %lu)\n", _s(*self), _s(*(self->slots->table)));
     printf(
         "dyn_perf test_size: %'lu(key/value pairs cnt), %'lu(bytes) \n"
         ,cnt

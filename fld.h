@@ -17,7 +17,7 @@
 #define fld_wrd_bit(word, index) ((word) &   (_t(word))bits_pow_2(index))
 
 typedef struct fld_t {
-    unsigned char *words;
+    unsigned short *words;
     struct fld_t *_next;
 } fld_t;
 
@@ -58,6 +58,36 @@ static inline void fld_pow2_recl_clnd(fld_t *fld, size_t capct) {
 
 
 #define fld_byt_comspt(fld, capct) (_s(*(fld)) + (_s((fld)->words[0]) * fld_calc_length(fld, capct)))
+
+static inline void fld_set_bits_indices(register const fld_t *const self, size_t capct, size_t *dest) {
+    register size_t curr, index;
+
+    for (curr = 0; curr < capct; curr++) {
+        _t(self->words[curr]) word = self->words[curr];
+
+        unsigned char cnt = bits_cnt_ones(word);
+
+        if (cnt & 1) { // if odd
+            *dest = bits_trln_one(word);
+            word >>= (*dest++ + 1);
+            cnt--;
+        }
+
+        for (; cnt; cnt -= 2) { // even number of set bits scan from the left and from the right ...
+            const unsigned char
+                leadng = bits_leadn_one(word),
+                trailn = bits_trlng_zrs(word);
+
+            *dest++ = (curr * bit_size(word)) + leadng;
+            *dest++ = (curr * bit_size(word)) + trailn;
+
+//            word &= ~((1 << leadng) | (1 << trailn));
+
+            word <<= (leadng + 1);
+            word >>= (leadng + trailn + 2);
+        }
+    }
+}
 
 
 #endif

@@ -21,15 +21,16 @@ typedef struct dyn_perf_t {
         } *slots;
     };
 
-    fld_t *entry_type;
+    dyn_perf_len_t  coef;
+    unsigned short  shift_mag;
+
+    fld_t         *entry_type;
 
     dyn_perf_len_t length;
 
     struct {dyn_perf_len_t items, slots;} cnt;
     struct {dyn_perf_len_t items, slots;} capct;
 
-    dyn_perf_len_t coef;
-    unsigned char shift_mag;
 } dyn_perf_t;
 
 alloc_recl_sign_templs(dyn_perf);
@@ -38,19 +39,19 @@ alloc_recl_sign_templs(dyn_perf);
 static const struct {
     const dyn_perf_len_t load;
     const double         resize;
-} factors = {.load = 2, .resize = 2};
+} factors = {.load = 2, .resize = .6};
 
 static inline dyn_perf_len_t dyn_perf_calc_capct(const dyn_perf_len_t size) {
     return size * factors.resize; //factors.load;
 }
 static inline dyn_perf_len_t dyn_perf_calc_slots_capacity(const dyn_perf_len_t size) {
     // c resizing factor, some value strictly greater than zero
-    // M = (1 + c) * max(count, 4);
+    // M = (1 + c) * max(count, 4);  // capacity
     // s(M) is the number of subsets to partition on
     // 32 * M^2 / s(M) + 4 * M // <<< max number of slots for sub tables ...
-    const dyn_perf_len_t M = size/factors.resize;
+    const dyn_perf_len_t M = size * factors.resize;
 
-    return M * (((32/dyn_perf_calc_capct(size)) * M) + 4); // TODO: check for overflows, size cannot exceed 27 words ...
+    return M * (((32/size) * M) + 4); // TODO: check for overflows, size cannot exceed 27 words ...
 }
 
 
@@ -105,8 +106,7 @@ static inline void dyn_perf_recl_prts(register dyn_perf_t *const self) {
                     slots->table->cnt--;
                 }
 
-            entries_recl_cleand(slots->table->slots, slots->table->length);
-            table_recl(slots->table);
+            sub_table_cleand_recl(slots->table);
 
             slots->entry = empty_entry;
             dyn_perf_mark_entry(self, (slots - self->slots));
@@ -122,29 +122,38 @@ static inline void dyn_perf_recl_prts(register dyn_perf_t *const self) {
 }
 
 
-static inline void dyn_perf_entrs(dyn_perf_t *const self, entry_t **dest) {
-    _t(dest) termnl = dest + self->cnt.items;
-    _t(self->slots) slots;
+static inline void dyn_perf_entrs(register dyn_perf_t *const self, const entry_t *dest[]) {
+    _t(self->length) cnt = self->cnt.items, ids;
 
-    for (slots = self->slots; dest < termnl; slots++) {
-        if (dyn_perf_entry_is_table(self, slots - self->slots)) {
-            sub_tbl_entrs(slots->table, dest);
-            dest += slots->table->cnt;
+    for (ids = 0; cnt; ids++) {
+        for (; self->slots[ids].entry == empty_entry; ids++) ;
 
-            dyn_perf_mark_entry(self, slots - self->slots);
-            entries_recl_cleand(slots->table->slots, slots->table->length);
-            table_recl(slots->table);
-        } else if (slots->entry != empty_entry)
-            *dest++ = slots->entry;
+        void *obj = self->slots[ids].entry;
 
-        slots->entry = empty_entry;
+        if (dyn_perf_entry_is_table(self, ids)) {
+            sub_tbl_entrs((table_t *)obj, &dest[(cnt -= ((table_t *)obj)->cnt)]);
+            sub_table_cleand_recl((table_t *)obj);
+        } else
+            dest[--cnt] = obj;
+
+        dyn_perf_mark_entry(self, ids);
+        self->slots[ids].entry = empty_entry;
     }
 }
 
+static inline void *dyn_perf_query(dyn_perf_t *self, register entry_key_t key) {
+    _t(key) index = dyn_perf_hash(self, key);
+
+    return dyn_perf_entry_is_table(self, index)
+        ? query_table(self->slots[index].table, key)
+        : query_entry(self->slots[index].entry, key)
+        ;
+}
 
 
 void dyn_perf_insert(dyn_perf_t *self, entry_key_t key, void *item);
-void *dyn_perf_query(const dyn_perf_t *const self, entry_key_t);
+void dyn_perf_remove(dyn_perf_t *self, entry_key_t key);
+
 
 void test_dyn_perf(
     dyn_perf_t      *self

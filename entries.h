@@ -16,12 +16,18 @@ static inline _t(cleand_entries[0]) entries_new(size_t length) {
     _t(cleand_entries[0]) *const bucket = &cleand_entries[entries_calc_id(length)];
 
     _t(*bucket) self =
-        ((*bucket) != NULL)
-              ? (*bucket)
-              : mem_set_pattrn(malloc(sizeof(entry_t *) * length), (uword_t)empty_entry, length);
+        *bucket ? *bucket
+                : mem_set_pattrn(malloc(sizeof(entry_t *) * length), (uword_t)empty_entry, length);
 
-    *bucket = ((self == *bucket) ? (void *)*self : *bucket);
+    *bucket = (*bucket ? (void *)*self : *bucket);
     *self = empty_entry;
+
+//    if (*bucket) {
+//        self = *bucket;
+//        *bucket = (void *)*self;
+//        *self = empty_entry;
+//    } else
+//        self = mem_set_pattrn(malloc(sizeof(entry_t *) * length), (uword_t)empty_entry, length);
 
     return self;
 }

@@ -31,7 +31,7 @@
 //                and the expected operand_size 1 of (1, 2, 4, 8), (use 0 for no operands)
 //                @returns the instruction as a literal string.
 
-#define intrsc_signat(ret_type) __inline ret_type __attribute__((intrsc_attrs))
+#define intrsc_signat(ret_type) static __inline ret_type __attribute__((intrsc_attrs))
 
 #ifdef __INTEL_COMPILER // <<<<<< icc seems to be missing some of the builtin intrinsics that are part of gcc/clang
     intrsc_signat(unsigned)
@@ -65,6 +65,11 @@
 #   define __builtin_popcountb     __builtin_popcounts
 /************************************************************************************************/
 #endif
+
+intrsc_signat(unsigned short) __builtin_popcounts(unsigned short x) {
+    asm (att_instr(popcnt, 2) " %0, %0" : "=r" (x) : "0"(x));
+    return x;
+}
 
 
 #define bits_leadn_zrs_8  __builtin_clzb

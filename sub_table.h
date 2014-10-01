@@ -15,135 +15,131 @@ typedef struct table_t {
         struct table_t *_next;
         entry_t       **slots;
     };
-    unsigned long long coef;
+
+    entry_key_t    coef;
 
     unsigned short length;
 
-    unsigned char capct, cnt;
-    unsigned short shift_mag;
+    unsigned char cnt, capct, shift_mag;
 } table_t;
 
 alloc_recl_sign_templs(table);
 
-#define sub_table_hash(key, coef, shft_mag) (((key) * (coef)) >> (shft_mag))
+
+static inline size_t sub_table_byte_consmp(const table_t *const table){ return _s(*table); }
+
+#define sub_table_hash hash_univ_pow2
 
 
-static inline table_t *table_build_2(entry_t *const entry_a, entry_t *const entry_b) {
-    table_t *self = table_alloc();
-    const _t(self->length) initial_size  = 16;
+static inline table_t *table_build_2(const entry_t *const entry_a, const entry_t *const entry_b) {
+    static const _t(((table_t){}).length) initial_size  = 4;
 
-    self->length = initial_size;
-    self->cnt    = 2;
-    self->capct  = 4;
+    register table_t *const self = table_alloc();
+
+    self->length    = initial_size;
+    self->cnt       = 2;
+    self->capct     = 2;
+    self->coef      = hash_rand_coef(self->coef);
+    self->shift_mag = bit_size(self->coef) - 2;
+
+    register _t(self->length) loc_a, loc_b;
+    for (;
+           (loc_a = sub_table_hash(entry_a->key, self->coef, self->shift_mag))
+        == (loc_b = sub_table_hash(entry_b->key, self->coef, self->shift_mag)) ;
+        self->coef = hash_rand_coef(self->coef)
+    );
 
     self->slots = entries_new(initial_size);
-    init_hash(self);
 
-    _t(self->coef)      coef = self->coef;
-    _t(self->shift_mag) shft = self->shift_mag;
-
-    const _t(entry_a->key)
-        key_a = entry_a->key,
-        key_b = entry_b->key;
-
-    for ( ;
-        comp_unlikely(sub_table_hash(key_a, coef, shft) == sub_table_hash(key_b, coef, shft));
-        coef = hash_rand_coef(coef)
-    ) ;
-
-
-    self->coef = coef;
-
-    self->slots[sub_table_hash(key_a, coef, shft)] = entry_a;
-    self->slots[sub_table_hash(key_b, coef, shft)] = entry_b;
+    self->slots[loc_a] = (entry_t *)entry_a;
+    self->slots[loc_b] = (entry_t *)entry_b;
 
     return self;
 }
 
+static inline void sub_table_cleand_recl(table_t *self) {
+    entries_recl_cleand(self->slots, self->length);
+    table_recl(self);
+}
 
-
-static inline void sub_tbl_rebuild(table_t *table, entry_t **entries) {
-    _t(table->length) hashes[table->cnt], *hash = hashes;
-
-    _t(table->coef)        coef = table->coef;
-    _t(table->shift_mag)   shft = table->shift_mag;
-
-    fld_t *fld = fld_pow2_new(table->length);
-
-    register _t(entries)
-        curr, terminal = entries + table->cnt;
-
-    for (curr = entries; curr < terminal; hash++) {
-        register _t(*hash) index = *hash = sub_table_hash((*curr++)->key, coef, shft);
-
-        if (fld_get(fld, index)) {
-            for (table->coef = coef = hash_rand_coef(coef); hash >= hashes; hash--)
-                fld->words[*hash / bit_size(fld->words[0])] = 0;
-            curr = entries;
-        } else
-            fld_set(fld, index);
-    }
-
-    while (--curr >= entries) {
-        table->slots[*--hash] = *curr;
-        fld->words[*hash / bit_size(fld->words[0])] = 0;
-    }
-
-    fld_pow2_recl_clnd(fld, table->length);
+static inline void *query_table(table_t *self, register entry_key_t key) {
+    return query_entry(self->slots[sub_table_hash(key, self->coef, self->shift_mag)], key);
 }
 
 
-static inline void sub_tbl_entrs(table_t *table, register entry_t **dest) {
-    _t(dest) termnl = dest + table->cnt;
-    _t(table->slots) slots;
-    for (slots = table->slots; dest < termnl; slots++) {
-        if (*slots != empty_entry)
-            *dest++ = *slots;
-        *slots = empty_entry;
+static inline void sub_table_rebuild(register table_t *const self, const entry_t *src[]) {
+    typedef _t(self->length) len_t;
+    static const len_t word_bit_l = bit_size(*((fld_t){}).words);
+
+    fld_t *fld = fld_pow2_new(self->length);
+    len_t curr;
+    len_t hashes[self->cnt];
+
+    for (curr = 0; curr < self->cnt; curr++) {
+        hashes[curr] = sub_table_hash(src[curr]->key, self->coef, self->shift_mag);
+
+        if (fld_get(fld, hashes[curr]))
+            for (self->coef = hash_rand_coef(self->coef); curr--; fld->words[hashes[curr] / word_bit_l] = 0) ;
+        else
+            fld_set(fld, hashes[curr]);
+    }
+
+    for (curr = 0; curr < self->cnt; fld->words[hashes[curr++] / word_bit_l] = 0)
+        self->slots[hashes[curr]] = (entry_t *)src[curr];
+
+    fld_pow2_recl_clnd(fld, self->length);
+}
+
+static inline void sub_tbl_entrs(register table_t *const self, const entry_t *dest[]) {
+    register _t(self->length) cnt = 0, curr;
+    for (curr = 0; cnt < self->cnt; curr++) {
+        for (; self->slots[curr] == empty_entry; curr++) ;
+
+        dest[cnt++]       = self->slots[curr];
+        self->slots[curr] = empty_entry;
     }
 }
 
-static inline void sub_tbl_expand(table_t *self, entry_t *append) {
-    self->capct        *= 2;
-    self->shift_mag    -= 2;
-
-    entry_t *entries[self->cnt + 1];
+static inline void sub_tbl_expand(register table_t *const self, const entry_t *const append) {
+    const entry_t *entries[self->cnt + 1];
 
     sub_tbl_entrs(self, entries);
-
     entries[self->cnt++] = append;
 
     entries_recl_cleand(self->slots, self->length);
 
-    self->slots = entries_new((self->length *= 4));
+    self->capct      *= 2;
+    self->shift_mag  -= 2;
 
-    sub_tbl_rebuild(self, entries);
+    self->length     *= 4;
+    self->slots       = entries_new(self->length);
+
+    sub_table_rebuild(self, entries);
 }
 
 
-static inline void sub_tbl_rehash(table_t *self, entry_t *append) {
-    entry_t *entries[self->cnt + 1];
-
+static inline void sub_tbl_rehash(register table_t *const self, const entry_t *const append) {
+    const entry_t *entries[self->cnt + 1];
     sub_tbl_entrs(self, entries);
     entries[self->cnt++] = append;
 
-    sub_tbl_rebuild(self, entries);
+    sub_table_rebuild(self, entries);
 }
 
-
-static inline void sub_tbl_set_entry(table_t *self, entry_t *entry) {
-    // sets an entry, (expands on capct reached) (rehahsesh on collision)
-    _t(entry) *slot = &self->slots[sub_table_hash(entry->key, self->coef, self->shift_mag)];
-
+static inline void sub_tbl_set_entry(register table_t *const self, const entry_t *const entry) {
+//                 ^^^^^^^^^^^^^^^^^ sets an entry, (expands on capct reached or rehahsesh on collision)
     if ((self->cnt + 1) > self->capct)
         sub_tbl_expand(self, entry);
-    else if (*slot == empty_entry) {
-        *slot = entry;
-        ++(self->cnt);
-    } else
-        sub_tbl_rehash(self, entry);
-}
+    else {
+        const _t(self->length) id = sub_table_hash(entry->key, self->coef, self->shift_mag);
 
+        if (self->slots[id] == empty_entry) {
+            self->slots[id] = (entry_t *)entry;
+            self->cnt++;
+        } else
+            sub_tbl_rehash(self, entry);
+    }
+}
 
 
 
