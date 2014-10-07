@@ -8,7 +8,6 @@
 
 #include "comp_utils.h"
 
-
 // the following assumes an address layout as: (0) static || heap() -> | <- stack() (2**n), where || is fixed and | can move either way...
 //#define alloc_is_static(ptr) ((void *)(ptr) < sbrk(0))  // static allocation ie (global), assuming malloc doesn't use sbrk
 //#define alloc_is_local(ptr) ((void *)&((char){0}) < (void *)(ptr)) // stack allocation
@@ -60,20 +59,21 @@ static const alloc_mgt_t(id) alloc_mgt(id) = {  \
 // OBJECT Recycler **************************************************************************************************
 #define recl_rem(recl_objs) ({register typeof(recl_objs) obj = recl_objs; recl_objs = obj->_next; obj;})
 //      ^^^^^^^^  removes (reuses) a previously recycled object.
-#define recl_add(recl_objs, obj) ({obj->_next = recl_objs; recl_objs = obj; (void)0;})
+//#define recl_add(recl_objs, obj) ({obj->_next = recl_objs; recl_objs = obj; (void)0;})
 //      ^^^^^^^^ adds a new object to the recycled list (for later reuse by the allocator.)
 
 #define reclr(id) id ## _recl
 
-#define recl_sign_tmpl(id) void reclr(id)(t_frm_prefx(id) *obj) // <<<<<<< gets signature of recycler of a type name
+#define recl_sign_tmpl(id) void reclr(id)(t_frm_prefx(id) *const) // <<<<<<< gets signature of recycler of a type name
 
 #define recl_tmpl(id)                                                   \
-    recl_sign_tmpl(id) {                                                \
-        typedef t_frm_prefx(id) obj_t;                               \
+    inline void reclr(id)(t_frm_prefx(id) *const self) {                \
+        typedef t_frm_prefx(id) obj_t;                                  \
         typedef obj_t **const mgt_attr_t;                               \
                                                                         \
-        static mgt_attr_t objs = (mgt_attr_t)&alloc_mgt(id)._recld;     \
-        recl_add(*objs, obj);                                           \
+        static mgt_attr_t prevs = (mgt_attr_t)&alloc_mgt(id)._recld;    \
+        self->_next = *prevs;                                           \
+        *prevs      = self;                                             \
     }
 // ^^^^^^^^^^^^^^^^^ template for recycling objects,
 // it uses the objects (_next) attribute, to create a link list of recycled objects.
@@ -83,7 +83,7 @@ static const alloc_mgt_t(id) alloc_mgt(id) = {  \
 
 #define release_tmpl(id)                                                                \
     release_alloc_blocks_sign(id) {                                                     \
-        typedef t_frm_prefx(id) obj_t;                                               \
+        typedef t_frm_prefx(id) obj_t;                                                  \
         typedef obj_t **const mgt_attr_t;                                               \
                                                                                         \
         static mgt_attr_t                                                               \
@@ -110,7 +110,7 @@ static const alloc_mgt_t(id) alloc_mgt(id) = {  \
 #define page_size() 4096LLU
 #define alloc_templ(id)                                                     \
     alloc_sign_tmpl(id) {                                                   \
-        typedef t_frm_prefx(id) obj_t;                                   \
+        typedef t_frm_prefx(id) obj_t;                                      \
         typedef obj_t **const mgt_attr_t;                                   \
                                                                             \
         static const obj_t *const empty = alloc_block_no_values;            \
@@ -136,7 +136,7 @@ static const alloc_mgt_t(id) alloc_mgt(id) = {  \
     }
 
 
-#define allocr(id) id ## _alloc
+#define allocr(id)          id ## _alloc
 #define alloc_sign_tmpl(id) t_frm_prefx(id) *allocr(id)() // <<<<< gets singature of an object allocator from its id
 
 #define alloc_rec_templs(id)            \
