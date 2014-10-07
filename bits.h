@@ -6,13 +6,6 @@
 #include "comp_utils.h"
 #include "scalrs.h"
 
-
-#ifdef __INTEL_COMPILER
-#   define intrsc_attrs __gnu_inline__, __always_inline__, __artificial__
-#else
-#   define intrsc_attrs __gnu_inline__, __always_inline__
-#endif
-
 //#define bits_set_trlng_ones(cnt) (((_t(cnt))1 << (cnt)) - (_t(ones_cnt))1)
 ////      ^^^^ return a seq of ones, using the fact that 0b100000 - 1 == 0b011111,
 ////           that has the same type as bit_cnt
@@ -30,19 +23,14 @@
 //      ^^^^^^^^^ giving the instr_name as an identifier
 //                and the expected operand_size 1 of (1, 2, 4, 8), (use 0 for no operands)
 //                @returns the instruction as a literal string.
-
-#define intrsc_signat(ret_type) static __inline ret_type __attribute__((intrsc_attrs))
-
 #ifdef __INTEL_COMPILER // <<<<<< icc seems to be missing some of the builtin intrinsics that are part of gcc/clang
-    intrsc_signat(unsigned)
-        __builtin_clzs(unsigned short x) {
+    static_inline unsigned short intrsc_attrs __builtin_clzs(unsigned short x) {
     //  ^^^^^^^^^^^^^^ count leading zeros on a short (16 bit intgl), return 15 if all zeros ...
         asm (att_instr(bsr, 2) " %0, %0\t\nxor $15, %0\t\n" : "=r" (x) : "0"(x));
         return x;
     }
 
-    intrsc_signat(unsigned)
-        __builtin_ctzs(unsigned short x) {
+    static_inline unsigned short intrsc_attrs __builtin_ctzs(unsigned short x){
     //  ^^^^^^^^^^^^^^ counts trailing zeros on a short (16 bit intgl), return 0 if 0 ...
         asm (att_instr(bsf, 2) " %0, %0" : "=r" (x) : "0"(x));
         return x;
@@ -53,23 +41,18 @@
     //                     __builtin_clz uses unsigned int, so char -> unsigned int adds 24 zeros.
 #   define __builtin_ctzb(x)   __builtin_ctz((unsigned int)(x) | 0xFFFFFF00)
     //      ^^^^^^^^^^^^^^ count trailing zeros of a byte
-#   define __builtin_popcountb __builtin_popcount
-    //      ^^^^^^^^^^^^^^^^^^^ count the number of ones of a byte
-    //                          __builtin_popcount uses unsinged int,
-    //                          so when arg is conv the sign isn't extend
 #else
-#   define __builtin_clzb(x)       __builtin_clzs((unsigned short)(x) | (unsigned short)0xFF00)
-#   define __builtin_ctzb(x)       __builtin_ctzs((unsigned short)(x) | (unsigned short)0xFF00)
-
-#   define __builtin_popcountb     __builtin_popcounts
-
+#   define __builtin_clzb(x)    __builtin_clzs((unsigned short)(x) | (unsigned short)0xFF00)
+#   define __builtin_ctzb(x)    __builtin_ctzs((unsigned short)(x) | (unsigned short)0xFF00)
 /************************************************************************************************/
 #endif
 
-intrsc_signat(unsigned short) __builtin_popcounts(unsigned short x) {
+static_inline unsigned short intrsc_attrs __builtin_popcounts(unsigned short x) {
     asm (att_instr(popcnt, 2) " %0, %0" : "=r" (x) : "0"(x));
     return x;
 }
+
+#define __builtin_popcountb  __builtin_popcounts
 
 
 #define bits_leadn_zrs_8  __builtin_clzb
