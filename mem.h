@@ -3,15 +3,12 @@
 #define __MEM_H__
 
 #include <stddef.h>
-#include <xmmintrin.h>// <x86intrin.h>
-#include <pmmintrin.h>
-#include <emmintrin.h>
-
 
 #include "comp_utils.h"
 #include "scalrs.h"
+#include "vect.h"
+#include "sse.h"
 
-#define array_cnt(arr) (sizeof(arr)/sizeof((arr)[0]))
 
 typedef __m128i lrgst_vect_ingtl_t;
 typedef void (*vect_ingl_storr)(lrgst_vect_ingtl_t *, lrgst_vect_ingtl_t);
@@ -38,63 +35,47 @@ scalr_switch_oblvs_sign_intgl(  \
     (void)0                     \
 )(expr)
 
-#define mem_inline_sign static __inline__ void * __attribute__((__always_inline__))
+#define mem_inline_sign static_inline void * __attribute__((__always_inline__))
 
-mem_inline_sign mem_clr(void *const _src, unsigned long byte_cnt) {
-    typedef lrgst_vect_ingtl_t oprn_t;
-    typedef lrgst_vect_storr_t storr_t;
 
-    unsigned char *const src = _src;
-
-    register typeof(byte_cnt) consmd;
-    for (consmd = 0; consmd < (byte_cnt % sizeof(oprn_t)); consmd++)
-        src[consmd] = 0; // need byte_cnt to be a multiple of vect size ...
-
-    if (comp_likely(consmd < byte_cnt)) { // <<<< remainder and cnt is a multiple of sizeof(oprn_t)
-        register oprn_t *dest = (void *)&src[consmd], zero = lrgst_vect_ingtl_setzero();
-
-        const storr_t store = ((uword_t)dest % sizeof(*dest)) ? lrgst_vect_storr : lrgst_vect_storr_align;
-
-        byte_cnt -= consmd;
-        consmd   = (byte_cnt / sizeof(*dest));
-        byte_cnt = consmd % 4; // <<< get remainder
-        consmd  /= 4; // <<<< get unrolled count
-
-        switch (byte_cnt) { // clear 64 bytes at a time ...
-            case 0: do {
-                    store(dest++, zero);
-            case 3: store(dest++, zero);
-            case 2: store(dest++, zero);
-            case 1: store(dest++, zero);
-            } while (consmd--);
-        }
-    }
-    return _src;
+static_inline void *malloc_align(const size_t byte_cnt) {
+    void *const temp = malloc(byte_cnt + _s(lrgst_vect_ingtl_t));
+    return (void *)((uword_t)temp + (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t))));
+}
+static_inline void free_align(void *const temp) {
+    free((void *)((uword_t )temp - (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t)))));
 }
 
-#define mem_set_pattrn(_dest, _pattern, times) ({                                    \
-    typedef lrgst_vect_ingtl_t oprn_t;                                               \
-    typedef lrgst_vect_storr_t storr_t;                                              \
-                                                                                     \
-    register _t(_pattern) *const items = (_dest), pattern = (_pattern);              \
-    register size_t index;                                                           \
-    for (index = 0; index < ((times) % (_s(oprn_t)/_s(pattern))); index++)           \
-        items[index] = pattern;                                                      \
-    register const oprn_t vect_pattrn = lrgst_vect_brdcst_intgl(pattern);            \
-    register oprn_t *vect_dest = (oprn_t *)&items[index];                           \
-    register word_t block_cnt  = ((times) / (_s(oprn_t)/_s(pattern))) / 4;           \
-    const storr_t store = ((uword_t)vect_dest % _s(oprn_t))                         \
-                    ? lrgst_vect_storr : lrgst_vect_storr_align;                     \
-    switch (((times) / (_s(oprn_t)/_s(pattern))) % 4) {                              \
-        case 0: do {                                                                 \
-                store(vect_dest++, vect_pattrn);                                    \
-        case 3: store(vect_dest++, vect_pattrn);                                    \
-        case 2: store(vect_dest++, vect_pattrn);                                    \
-        case 1: store(vect_dest++, vect_pattrn);                                    \
-        } while (--block_cnt > 0);                                                      \
-    }                                                                               \
-    (void *)items;                                                                  \
-})
- // TODO: it seems this won't compile under icc generating unknown symbol _mm_storeu_si128, _mm_store_si128
+static_inline void *mem_clr_align(void *dest, const size_t byte_cnt) {
+    typedef vect_lrgst_intgl_type oprn_t;
+
+    const _t(vect.lrgst.intgl.ops->store_align) set = vect.lrgst.intgl.ops->store_align;
+    const oprn_t zero = vect.lrgst.intgl.ops->setzeros();
+
+    size_t curr;
+    for (curr = 0; curr < (byte_cnt % _s(oprn_t)); curr++)
+        ((unsigned char *)dest)[curr] = 0;
+
+    switch ((byte_cnt / _s(zero)) % 2) {
+        case 1: set((oprn_t *)&dest[curr], zero);
+                curr += _s(zero);
+
+        case 0: for (; curr < byte_cnt; curr += (2 * _s(zero))) {
+                set((oprn_t *)&dest[curr],              zero);
+                set((oprn_t *)&dest[curr + _s(oprn_t)], zero);
+            }
+    }
+    return dest;
+}
+#define macro_unroll(func, times, args...)  \
+    _t(times) block_cnt = (times) / 4;      \
+    switch ((times) % 4) {                  \
+        case 0: do {                        \
+                func(args);                 \
+        case 3: func(args);                 \
+        case 2: func(args);                 \
+        case 1: func(args);                 \
+        } while (block_cnt--);              \
+    }
 
 #endif
