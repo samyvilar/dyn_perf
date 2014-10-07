@@ -3,95 +3,98 @@
 #include "fld.h"
 #include "sub_table.h"
 
-
-typedef _t(*(((dyn_perf_t *)NULL)->slots)) slot_t;
-
-
 // OS X default stack size: 8192000 bytes ...
 
+static_inline void dyn_perf_expand(dyn_perf_t *const self) {
+    const entry_t **const entries = malloc(self->cnt * _s(self->slots->entry));
 
-static inline void dyn_perf_expand(register dyn_perf_t *const self) {
-    const entry_t **const entries = malloc(self->cnt.items * _s(self->slots->entry));
+    dyn_perf_cln_entrs(self, entries);
 
-    dyn_perf_entrs(self, entries);
+    entries_pow2_recl_cleand((entry_t **)self->slots, self->len_log2);
+    fld_pow2_recl_clnd(self->entry_type, self->len_log2);
 
-    entries_recl_cleand((entry_t **)self->slots, self->length);
-    fld_pow2_recl_clnd(self->entry_type, self->length);
-
-    self->cnt.slots = 0;
+    self->slots_cnt = 0;
+    self->len_log2++;
     self->shift_mag--;
-    self->length   *= 2;
 
-    self->capct.items = dyn_perf_calc_capct             (self->length);
-    self->capct.slots = dyn_perf_calc_slots_capacity    (self->length);
-    self->entry_type  = fld_pow2_new                    (self->length);
-    self->slots       = (_t(self->slots))entries_new    (self->length);
+    self->entry_type = fld_pow2_new(self->len_log2);
+    self->slots      = (_t(self->slots))entries_pow2_new(self->len_log2);
 
-    _t(self->length) curr;
-    for (curr = 0; curr < self->cnt.items; curr++) {
-        const _t(self->length) id   = hash_univ_pow2(entries[curr]->key, self->coef, self->shift_mag);
-        slot_t  *const         slot = &self->slots[id];
+    dyn_perf_rebuild(self, entries);
 
-        if (slot->entry == empty_entry)
-            slot->entry = (entry_t *)entries[curr];
-        else if (dyn_perf_entry_is_table(self, id)) {
-            const _t(slot->table->length) prev = slot->table->length;
-
-            sub_tbl_set_entry(slot->table, entries[curr]);
-
-            self->cnt.slots += slot->table->length - prev;
-        } else {
-            slot->table = table_build_2(slot->entry, entries[curr]);
-
-            dyn_perf_mark_entry_table(self, id);
-
-            self->cnt.slots += slot->table->length;
-        }
-    }
-
-    assert_with_msg(self->cnt.slots <= self->capct.slots, "failed to expand properly!");
     free((void *)entries);
 }
 
+static_inline void insert_sub_table(
+    dyn_perf_t *const               self,
+    const _t(((entry_t){}).key)     slot_id,
+    const _t(((entry_t){}).key)     key,
+    const _t(((entry_t){}).item)    item
+){
+    table_t *const            table = self->slots[slot_id].table;
 
-static inline void insert_sub_table(dyn_perf_t *const self, table_t *const table, const entry_key_t key, void *const item)
-{
-    const _t(table->slots) slot = &table->slots[sub_table_hash(key, table->coef, table->shift_mag)];
+    const unsigned short      id    = sub_table_hash(key, table->coef, table->shift_mag);
+    //    ^^^^^^^^^^^^^^ subtables are quite small, hence we use a short ...
+    const _t(table->slots[0]) entry = table->slots[id];
 
-    if (((*slot)->key != key) || (*slot == empty_entry)) { // if keys match, make sure its not default empty key
-        const _t(table->length) prev = table->length;
-        sub_tbl_set_entry(table, entry_new(key, item));
-        self->cnt.slots += (table->length - prev);
+    if ((entry == empty_entry) || (entry->key != key)) {
+        const _t(sub_table_length(table)) prev = sub_table_length(table);
 
-        self->cnt.items++;
+        sub_table_set_entry(table, id, entry_new(key, item));  // <<<< insert new item ...
+
+        self->slots_cnt += (sub_table_length(table) - prev); // <<<< add extra slots, if the sub table was expanded (doubld)
+        self->cnt++;
     } else
-        (*slot)->item = item; // non-empty entry with matchin keys (update) ...
+        entry->item = item; // <<<< keys match and item isn't empty, so update ...
+
 }
 
-static inline void insert_entry(dyn_perf_t *const self, slot_t *const slot, const entry_key_t key, void *const item){
+static_inline void insert_entry(
+    dyn_perf_t *const               self,
+
+    const _t(((entry_t){}).key)     id,
+    const _t(((entry_t){}).key)     key,
+    const _t(((entry_t){}).item)    item
+){
+    _t(self->slots[0]) *const slot = &self->slots[id];
+
     if (slot->entry == empty_entry) {
         slot->entry = entry_new(key, item);
-
-        self->cnt.items++;
+        self->cnt++;
     } else if (slot->entry->key != key) {
+        fld_flip(self->entry_type, id);
         slot->table = table_build_2(slot->entry, entry_new(key, item));
-        dyn_perf_mark_entry_table(self, slot - self->slots);
-        self->cnt.slots += slot->table->length;
 
-        self->cnt.items++;
+        self->slots_cnt += ((unsigned short)1 << sub_table.initial_len_log2);
+        self->cnt++;
     } else
         slot->entry->item = item;
+//    slot->entry = (slot->entry == empty_entry) ? entry_new(key, item) : slot->entry; // <<<< if empty create new entry .
+//
+//    if (slot->entry->key != key) { // <<<< if collision, convert entry into sub table
+//        fld_flip(self->entry_type, id);
+//        slot->table = table_build_2(slot->entry, entry_new(key, item));
+//        self->cnt.slots += 1 << sub_table.initial_len_log2;
+//    } else
+//        slot->entry->item = item; // <<<<< else its an update ...
+
 }
 
 
-void dyn_perf_insert(dyn_perf_t *self, const entry_key_t key, void *const item) {
-    const _t(dyn_perf_hash(self, key)) index = dyn_perf_hash(self, key);
 
-    if (dyn_perf_entry_is_table(self, index))
-        insert_sub_table(self, self->slots[index].table, key, item);
+
+void dyn_perf_setitem(
+    dyn_perf_t *const            self,
+    const _t(((entry_t){}).key)  key,
+    const _t(((entry_t){}).item) item
+) {
+    const _t(dyn_perf_hash(self, key)) id = dyn_perf_hash(self, key);
+
+    if (dyn_perf_entry_is_table(self, id))
+        insert_sub_table (self, id, key, item);
     else
-        insert_entry(self, &self->slots[index], key, item);
+        insert_entry     (self, id, key, item);
 
-    if ((self->cnt.items > self->capct.items) || (self->cnt.slots > self->capct.slots))
+    if ((self->cnt > dyn_perf_capct(self)) || (self->slots_cnt >  dyn_perf_slots_capct(self)))
         dyn_perf_expand(self);
 }
