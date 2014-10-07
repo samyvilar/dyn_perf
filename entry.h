@@ -3,31 +3,36 @@
 #ifndef __ENTRY_H__
 #define __ENTRY_H__
 
+#include "comp_utils.h"
 #include "alloc.h"
 
-typedef unsigned long entry_key_t;
-
 typedef struct entry_t {
-    entry_key_t          key;
     union {
         struct entry_t *_next;
-        void           *item;
+        struct {
+            unsigned long key;
+            void *item;
+        };
     };
 } entry_t;
 
+
+extern const entry_t *const empty_entry;
+
 alloc_recl_sign_templs(entry);
 
-static inline entry_t *entry_new(const entry_key_t key, void *const item) {
+static_inline entry_t *entry_new(const _t(((entry_t){}).key) key, const _t(((entry_t){}).item) item) {
     entry_t *const self = entry_alloc();
+
     self->key   = key;
-    self->item  = (void *)item;
+    self->item  = item;
+
     return (entry_t *)self;
 }
 
-extern entry_t *empty_entry;
-
-static inline void *query_entry(entry_t *self, register entry_key_t key)
-{   return (self->key == key) ? self->item : NULL;  }
+static_inline _t(((entry_t){}).item) entry_query(
+    const entry_t *const self,
+    const _t(((entry_t){}).key) key) { return (self->key == key) ? self->item : 0; }
 
 
 #endif
