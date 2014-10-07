@@ -4,10 +4,6 @@
 
 #include <assert.h>
 
-#define assert_with_msg(expr, msg) assert((msg && (expr)))
-#define comp_error_init(msg) ({ assert_with_msg(0, msg); (void)0;})
-#define comp_error_proc(expr) ({ typeof(expr) __ = (expr); })
-
 #ifndef _t
 #   define _t typeof
 #endif
@@ -16,9 +12,26 @@
 #   define _s sizeof
 #endif
 
-#ifndef bit_size
-#   define bit_size(type) (_s(type) * (_s(char) * CHAR_BIT))
+#ifndef bit_sz
+#   define bit_sz(type) (_s(type) * 8)
 #endif
+
+#ifndef array_cnt
+#   define array_cnt(arr) (_s(arr)/_s((arr)[0]))
+#endif
+
+
+#ifndef intrsc_attrs
+#   define intrsc_attrs __attribute__((__gnu_inline__, __always_inline__, __nodebug__)) //, __artificial__
+#endif
+
+#ifndef static_inline
+#   define static_inline static __inline__
+#endif
+
+#define assert_with_msg(expr, msg) assert((msg && (expr)))
+//#define comp_error_init(msg) ({ assert_with_msg(0, msg); (void)0;})
+//#define comp_error_proc(expr) ({ _t(expr) __ = (expr); })
 
 
 #define comp_select         __builtin_choose_expr
