@@ -10,7 +10,6 @@ static void __setentry(
 
     entry_t **other,
     entry_t *entry,
-
     oprtns_t *acts
 ) {
     const _t(acts->empty)
@@ -38,22 +37,12 @@ void dyn_perf_setitem(dyn_perf_t *const self, _t(((entry_t){}).key) id, const _t
         other = &(self->slots[id].entry);
         actns = &acts.entry;
     }
-    self->cnt += (*other)->key != entry->key;
+
+    self->cnt += (*other == empty_entry || (*other)->key != entry->key);
     __setentry(obj, other, entry, actns);
 
     if (self->cnt > dyn_perf_capct(self)) {
         self->irrlvnt_bits--;
-
-        other = dyn_perf_cln_entrs(self, malloc(self->cnt * _s(self->slots->entry)));
-
-        entries_pow2_recl_cleand((entry_t **)self->slots, self->len_log2);
-        fld_pow2_recl_clnd(self->entry_type, self->len_log2);
-
-        self->len_log2++;
-
-        self->slots = (_t(self->slots))entries_pow2_new(self->len_log2);
-        self->entry_type = fld_pow2_new(self->len_log2);
-
-        free((void *)dyn_perf_rebuild(self, other));
+        dyn_perf_rebuild(self, self->len_log2++);
     }
 }
