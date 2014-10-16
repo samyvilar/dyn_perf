@@ -6,7 +6,6 @@
 
 const entry_t *const empty_entry = &(entry_t){.key = (_t(((entry_t){}).key))-1};
 
-//alloc_rec_templs(entry);
 
 alloc_mgt_obj(entry);
 alloc_templ(entry)
