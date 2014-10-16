@@ -7,55 +7,90 @@
 #include "fld.h"
 #include "timed.h"
 #include "sub_table.h"
+#include "vect.h"
+#include "sse2.h"
 
 
 alloc_rec_templs(dyn_perf);
 
-//void test() {
-//    typedef struct foo_t {int *temp;} foo_t;
-//    register const foo_t *const self = &(foo_t){NULL};
-//    typeof(self->temp) ptr = self->temp;
-//    ptr++; // <<<< calng error ptr is read only ... very strange ....
-//}
+static void _dyn_perf_set_entry(dyn_perf_t *volatile self, _t(((entry_t){}).key) id, entry_t *entry) {
+    oprtns_t actions;
+    entry_t **other;
 
-static inline size_t dyn_perf_byt_consptn(register const dyn_perf_t *const self)
-{
-    register size_t total = 0;
+    if (dyn_perf_entry_is_table(self, id)) {
+        other = &(self->slots[id].table->slots[sub_table_hash(self->slots[id].table, entry->key)]);
+        actions = acts.table;
+        self = (void *)self->slots[id].table;
+    } else {
+        other = &(self->slots[id].entry);
+        actions = acts.entry;
+    }
 
-    total += _s(*self);
-    total += dyn_perf_length(self) * _s(_t(self->slots[0]) *);
-    total += self->slots_cnt * _s(entry_t *);
-    total += self->cnt * _s(entry_t);
-    total += fld_byt_comspt(self->entry_type, dyn_perf_length(self));
-
-    register _t(((entry_t){}).key) curr;
-
-    size_t cnt = 0;
-    for (curr = 0; curr < dyn_perf_length(self); curr++) // subtables ...
-        for (; dyn_perf_entry_is_table(self, curr); curr++)
-            cnt++;
-
-    return total + (cnt * _s(table_t));
+    const _t(actions.empty) setentry = *other != empty_entry ? actions.collsn : actions.empty;
+    setentry(self, other, entry);
 }
 
-static inline table_t *lrgst_sub_table(register const dyn_perf_t *const self) {
-    struct {unsigned long length; table_t *table;} max = {.length = 0, .table = NULL};
 
-    if (self->slots_cnt == 0)
-        return max.table;
+void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
+{
+    typedef _t(((entry_t){}).key)       memb_t;
+    typedef lrgst_vect_ingtl_t          oprn_t;
 
-    _t(self->slots->entry->key) curr, termnl = dyn_perf_length(self);
-    for (curr = 0; curr < termnl; curr++) {
-        for (; curr < termnl && !dyn_perf_entry_is_table(self, curr); curr++) ;
+    entry_t
+        **src = dyn_perf_cln_entrs(self, malloc(self->cnt * _s(self->slots->entry)), prev_id);
 
-        if (curr >= termnl) break ;
+    entries_pow2_recl_cleand((entry_t **)self->slots, prev_id);
+    self->slots = (_t(self->slots))entries_pow2_new(self->len_log2);
 
-        if (sub_table_length(self->slots[curr].table) > max.length) {
-            max.table = self->slots[curr].table;
-            max.length = sub_table_length(max.table);
-        }
+    fld_pow2_recl_clnd(self->entry_type, prev_id);
+    self->entry_type = fld_pow2_new(self->len_log2);
+
+    hashr_t *hashr = hashr_init(&(hashr_t){}, self->coef, self->irrlvnt_bits);
+
+    _t(self->cnt) curr, compnt, termnl = self->cnt - (self->cnt % (_s(oprn_t)/_s(memb_t)));
+    memb_t (*const get)(oprn_t, const int) = (_t(get))vect.lrgst.intgl.ops->get[_s(memb_t)];
+
+    for (curr = 0 ; curr < termnl; curr += _s(oprn_t)/_s(memb_t)) {
+        oprn_t ids;
+        for (compnt = 0; compnt < _s(oprn_t)/_s(memb_t); compnt++)
+            ((memb_t *) &ids)[compnt] = src[curr + compnt]->key;
+
+        for (ids = hashes(hashr, (memb_t *)&ids); compnt--;
+             _dyn_perf_set_entry(self, get(ids, compnt), src[curr + compnt])) ;
     }
-    return max.table;
+
+    for ( ; curr < self->cnt; curr++)
+        _dyn_perf_set_entry(self, dyn_perf_hash(self, src[curr]->key), src[curr]);
+
+    free(src);
+}
+
+
+
+size_t dyn_perf_byt_consptn(dyn_perf_t *self) {
+    size_t curr, cnt, lengths,
+        total = _s(*self)
+            + dyn_perf_length(self) * _s(_t(self->slots[0]) *)
+            + self->cnt * _s(entry_t)
+            + fld_byt_comspt(self->entry_type, self->len_log2)
+            ;
+
+    for (curr = cnt = lengths = 0; curr < dyn_perf_length(self); curr++) // subtables ...
+        for (; dyn_perf_entry_is_table(self, curr); cnt++)
+            lengths += sub_table_length(self->slots[curr++].table);
+
+    return total + (cnt * _s(*(self->slots->table))) + (lengths * _s(self->slots->table->slots[0]));
+}
+
+static inline table_t lrgst_sub_table(dyn_perf_t *self) {
+    table_t max = {{0}};
+
+    _t(self->slots->entry->key) curr;
+    for (curr = 0; curr < dyn_perf_length(self); curr++)
+        if (dyn_perf_entry_is_table(self, curr) && (sub_table_length(self->slots[curr].table) > sub_table_length(&max)))
+            max = *(self->slots[curr].table);
+
+    return max;
 }
 
 
@@ -70,7 +105,7 @@ void test_dyn_perf(
     const _t(*self) orignl = *self;
 
     static const _t(&dyn_perf_setitem) insert = dyn_perf_setitem;
-    static const _t(&dyn_perf_query)   query  = dyn_perf_query;
+    static const _t(&dyn_perf_getitem) query  = dyn_perf_getitem;
     static const _t(&dyn_perf_delitem) remove = dyn_perf_delitem;
 
 #   define test_insert() for (index = 0; index < cnt; index++) insert(self, keys[index], values[index])
@@ -113,7 +148,7 @@ void test_dyn_perf(
             }                                                       \
         cnts; })
 
-    table_t *max_sub_tbl = lrgst_sub_table(self);
+    table_t max_sub_tbl = lrgst_sub_table(self);
     sub_tbl_cnts_t sub_table_cnts = cnt_sub_tables(self);
 
     const struct {
@@ -132,12 +167,12 @@ void test_dyn_perf(
     } max = {
         .length      = dyn_perf_length(self),
         .byte_usage  = dyn_perf_byt_consptn(self),
-        .cnt         = {.items = self->cnt,   .slots = self->slots_cnt},
+        .cnt         = {.items = self->cnt , .slots = sub_table_cnts.slots},
         .capct       = {.items = dyn_perf_capct(self), .min = dyn_perf_thrshld(self), .slots = dyn_perf_slots_capct(self)},
         .sub_table   = {
-            .length = sub_table_length(max_sub_tbl),
-            .cnt    = max_sub_tbl->cnt,
-            .capct  = max_sub_tbl->capct
+            .length = sub_table_length(&max_sub_tbl),
+            .cnt    = max_sub_tbl.cnt,
+            .capct  = max_sub_tbl.capct
         }
     };
 
@@ -152,10 +187,6 @@ void test_dyn_perf(
             ,(unsigned long long)(b)    \
         )
 
-    expect(self->len_log2,      orignl.len_log2);
-    expect(self->cnt,           orignl.cnt);
-    expect(self->slots_cnt,     orignl.slots_cnt);
-
     for (index = 0; index < cnt; index++)
         expect(query(self, keys[index]), 0);
 
@@ -165,7 +196,7 @@ void test_dyn_perf(
         "Initial cnt: %'lu length: %'lu slots: %'lu \n" // "capacities: {items: %'lu slots: %'lu}\n
         ,(_t(cnt))orignl.cnt
         ,(_t(cnt))dyn_perf_length(&orignl)
-        ,(_t(cnt))orignl.slots_cnt
+        ,(_t(cnt))0
     );
     printf(
         "dyn_perf test_size: %'lu(key/value pairs cnt), %'lu(bytes) \n"
@@ -222,7 +253,7 @@ void test_dyn_perf(
         "final cnt: %'lu length: %'lu slots: %'lu \n" // capacities: {items: %'lu slots: %'lu}\n\n"
         ,(_t(cnt))self->cnt
         ,(_t(cnt))dyn_perf_length(self)
-        ,(_t(cnt))self->slots_cnt
+        ,(_t(cnt))0
     );
 
 //    hash_tbl_release_alloc_blocks();
