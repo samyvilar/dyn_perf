@@ -16,160 +16,115 @@ typedef struct table_t {
         entry_t       **slots;
     };
 
-    _t(((entry_t){}).key) coef;
+    _t(((entry_t){}).key)
+        coef;
 
-    unsigned char
-        len_log2,
-        cnt,
-        capct,
-        shift_mag;
+    union {
+        struct {
+            unsigned char
+                irrlvnt_bits,
+                len_log2,
+                cnt,
+                capct;
+        };
 
+        unsigned
+            stats;
+    };
 } table_t;
 
 alloc_recl_sign_templs(table);
 
-#define sub_table_length(self)     ((unsigned short)1 << (self)->len_log2)
+
+#define sub_table_length(self)     (1 << (self)->len_log2)
 #define sub_table_entries_id(self) ((self)->len_log2)
 
-
-#define sub_table_hash hash_univ_pow2
-
-static const struct {_t(((table_t){}).len_log2) initial_len_log2; } sub_table = {2};
+#define sub_table_rand_coef(type)
 
 
-static_inline table_t *table_build_2(const entry_t *const entry_a, const entry_t *const entry_b) {
-    table_t *const self = table_alloc();
-
-    self->len_log2  = sub_table.initial_len_log2;
-    self->shift_mag = bit_sz(self->coef) - sub_table.initial_len_log2;
-
-    self->slots     = entries_pow2_new(sub_table.initial_len_log2);
-
-    self->cnt       = 2;
-    self->capct     = 2;
-    self->coef      = hash_rand_coef(self->coef);
-
-    for ( ;
-        sub_table_hash(entry_a->key, self->coef, self->shift_mag) == sub_table_hash(entry_b->key, self->coef, self->shift_mag) ;
-        self->coef = hash_rand_coef(self->coef)
-    ) ;
-
-    self->slots[sub_table_hash(entry_a->key, self->coef, self->shift_mag)] = (entry_t *)entry_a;
-    self->slots[sub_table_hash(entry_b->key, self->coef, self->shift_mag)] = (entry_t *)entry_b;
-
-    return self;
+static_inline _t(((entry_t){}).key) sub_table_hash(const table_t *const self, const _t(((entry_t){}).key) key) {
+    return hash_univ_pow2(key, self->coef, self->irrlvnt_bits);
 }
 
+table_t *table_build_2(entry_t *entry_a, entry_t *entry_b);
+
+_t(((entry_t){}).item) sub_table_query(const table_t *const self, const _t(((entry_t){}).key) key);
+
 static_inline void sub_table_cleand_recl(table_t *const self) {
-    entries_pow2_recl_cleand(self->slots, sub_table_entries_id(self));
+    entries_pow2_recl_cleand(self->slots, self->len_log2);
     table_recl(self);
 }
 
-static_inline _t(((entry_t){}).item) sub_table_query(const table_t *const self, const _t(((entry_t){}).key) key) {
-    return entry_query(self->slots[sub_table_hash(key, self->coef, self->shift_mag)], key);
-}
 
-
-static_inline void sub_table_clean_prts_recl(table_t *const self) {
-    unsigned short curr;
-    for (curr = 0; self->cnt--; curr++) {
-        for (; self->slots[curr] == empty_entry; curr++) ;
-
-        entry_recl(self->slots[curr]);
-        self->slots[curr] = (void *)empty_entry;
-    }
-    sub_table_cleand_recl(self);
-}
-
-
-static_inline void sub_table_rebuild(table_t *const self, const entry_t *src[]) {
-    fld_t *const fld  = fld_pow2_new(self->len_log2);
-    unsigned short id, hashes[self->cnt];
-    _t(self->cnt) cnt;
-    for (cnt = 0; cnt < self->cnt; cnt++) {
-        id = hashes[cnt] = sub_table_hash(src[cnt]->key, self->coef, self->shift_mag);
-
-        if (fld_get(fld, id) == 0)
-            fld_flip(fld, id);
-        else
-            for (self->coef = hash_rand_coef(self->coef); cnt--; )
-                fld->words[hashes[cnt] / bit_sz(fld->words[0])] = 0;
-    }
-
-#   define setentry(index) ({                                       \
-        self->slots[(id = hashes[index])] = (entry_t *)src[index];  \
-        fld->words[id / bit_sz(fld->words[0])] = 0;                 \
-    })
-    cnt = self->cnt % 4;
-    switch (cnt) {
-        case 3: setentry(2);
-        case 2: setentry(1);
-        case 1: setentry(0);
-        case 0: for (; cnt < self->cnt; cnt += 4) {
-                setentry(cnt);
-                setentry(cnt + 1);
-                setentry(cnt + 2);
-                setentry(cnt + 3);
-            }
-    }
-#   undef setentry
-    fld_pow2_recl_clnd(fld, self->len_log2);
-}
-
-static_inline void sub_table_entrs(register table_t *const self, const entry_t *dest[]) {
-    unsigned char  cnt;
-    unsigned short curr;
-
-    for ((cnt = 0), (curr = 0); cnt < self->cnt; cnt++, curr++) {
-        for (; self->slots[curr] == empty_entry; curr++);
-
-        dest[cnt]         = self->slots[curr];
-        self->slots[curr] = (void *)empty_entry;
+static_inline void entrs_coll_clr(entry_t **src, entry_t **dest, size_t cnt) {
+    _t(cnt) curr;
+    for (curr = 0; cnt; src[curr++] = (void *)empty_entry) {
+        for (; empty_entry == src[curr]; curr++) ;
+        dest[--cnt] = src[curr];
     }
 }
 
-static_inline void sub_table_expand(register table_t *const self, const entry_t *const append) {
-    const entry_t *entries[self->cnt + 1];
-
-    sub_table_entrs(self, entries);
-    entries[self->cnt++] = append;
-
-    entries_pow2_recl_cleand(self->slots, sub_table_entries_id(self));
-
-    self->capct      *= 2;
-    self->shift_mag  -= 2;
-    self->len_log2   += 2;
-    self->slots       = entries_pow2_new(sub_table_entries_id(self));
-
-    sub_table_rebuild(self, entries);
-}
 
 
-static_inline void sub_table_rehash(register table_t *const self, const entry_t *const append) {
-    const entry_t *entries[self->cnt + 1];
+static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *append, unsigned short id) {
+    typedef lrgst_vect_ingtl_t      oprn_t;
+    typedef _t(((entry_t){}).key)   memb_t;
 
-    sub_table_entrs(self, entries);
-    entries[self->cnt++] = append;
+    entry_t *entries[self->cnt];
+    entries[0] = append;
+    entries[1] = *curr;
+    *curr      = (void *)empty_entry;
+    entrs_coll_clr(self->slots, &entries[2], self->cnt - 2);
+    entries_pow2_recl_cleand(self->slots, id);
 
-    self->coef = hash_rand_coef(self->coef);
-    sub_table_rebuild(self, entries);
-}
+    memb_t keys[self->cnt] __attribute__((aligned(sizeof(oprn_t))));
+    for (id = 0; id < self->cnt; id++)
+        keys[id] = entries[id]->key;
 
-static_inline void sub_table_set_entry(
-    register table_t *const self,
-    const unsigned short    id,
-    const entry_t *const    entry
-) {
-    self->slots[id] = (void *)((self->slots[id] == empty_entry) ? entry : self->slots[id]);
 
-    self->cnt += (self->slots[id] == entry);
+    oprn_t ids;
+    unsigned char cnt;
+    const _t(cnt) termnl = self->cnt - (self->cnt % (_s(oprn_t)/_s(memb_t)));
 
-    if (self->slots[id] != entry) {
-        if (self->cnt >= self->capct)  // <<<< only expand on collisions ....
-            sub_table_expand(self, entry);
-        else
-            sub_table_rehash(self, entry);
+    hashr_t *hash_buff = hashr_init(&(hashr_t){}, self->coef = hash_rand_coef(self->coef), self->irrlvnt_bits);
+    fld_t *const set = fld_pow2_new(self->len_log2);
+
+    memb_t (*const get)(oprn_t, const int) = (_t(get))vect.lrgst.intgl.ops->get[_s(memb_t)];
+
+    restart:
+    for (cnt = 0 ; cnt < termnl; cnt += _s(oprn_t)/_s(memb_t)) {
+        ids = hashes(hash_buff, &keys[cnt]);
+
+        for (id = 0; id < _s(oprn_t)/_s(memb_t); id++) {
+            unsigned short curr = get(ids, id);
+            fld_flip(set, curr);
+            if (fld_get(set, curr))
+                continue;
+            fld_clr(set, self->len_log2);
+            hashr_init_coef(hash_buff, self->coef = hash_rand_coef(self->coef));
+            goto restart;
+        }
     }
+    for ( ; cnt < self->cnt; cnt++) {
+        id = sub_table_hash(self, keys[cnt]);
+        fld_flip(set, id);
+        if (fld_get(set, id))
+            continue ;
+        fld_clr(set, self->len_log2);
+        hashr_init_coef(hash_buff, self->coef = hash_rand_coef(self->coef));
+        goto restart;
+    }
+
+    self->slots = entries_pow2_new(self->len_log2);
+    for (cnt = 0; cnt < termnl; cnt += _s(oprn_t)/_s(memb_t))
+        for ((ids = hashes(hash_buff, &keys[cnt])), (id = 0); id < _s(oprn_t)/_s(memb_t); id++)
+            self->slots[get(ids, id)] = entries[id + cnt];
+
+    for ( ; cnt < self->cnt; cnt++)
+        self->slots[sub_table_hash(self, keys[cnt])] = entries[cnt];
 }
+
+
+
 #endif
 
