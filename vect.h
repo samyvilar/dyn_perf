@@ -7,7 +7,7 @@
 #include "comp_utils.h"
 #include "scalrs.h"
 
-#include "sse.h"
+#include "sse2.h"
 
 
 #define vect_lrgst_intgl_type __m128i
@@ -19,7 +19,7 @@ static const struct {
     const struct {
         const struct {
             _t(sse.types.intgl) type;
-            _t(sse.ops.intgl)   *ops;
+            const _t(sse.ops.intgl) *const ops;
         } intgl;
     } lrgst;
 
