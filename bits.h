@@ -72,7 +72,8 @@ static_inline unsigned short intrsc_attrs __builtin_popcounts(unsigned short x) 
 /*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  * Counts the number of trailing zeros,
  * generates a single instruction
- *      bsf, bit scan forward
+ *      bsf, bit scan forward,
+ *      ~3 cycles on most modern intel x86 chips
 **/
 
 #define bits_cnt_ones_8  __builtin_popcountb
@@ -105,6 +106,11 @@ static_inline unsigned short intrsc_attrs __builtin_popcounts(unsigned short x) 
 #define bits_trln_one(x)  singl_param_integral_macro(bits_trlng_one_, x, unsigned)
 #define bits_cnt_ones(x)  singl_param_integral_macro(bits_cnt_ones_, x, unsigned)
 
+#define _leadn_one_index_asm(x, imm_byt_size) ({asm (att_instr(bsr, imm_byt_size) " %0, %0" : "=r" (x) : "0"(x));})
+static __inline__ unsigned long __builtin_ldn_one_indx_ll(unsigned long a) {
+    _leadn_one_index_asm(a, 8);
+    return a;
+}
 #define _leadn_one_index_asm(x, imm_byt_size) ({asm (att_instr(bsr, imm_byt_size) " %0, %0" : "=r" (x) : "0"(x));})
 #define bits_leadn_one(x) ({            \
     _t(x) dest = (x);                   \
