@@ -7,7 +7,7 @@
 #include "comp_utils.h"
 #include "scalrs.h"
 #include "vect.h"
-#include "sse.h"
+#include "sse2.h"
 
 
 typedef __m128i lrgst_vect_ingtl_t;
