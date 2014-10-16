@@ -22,7 +22,11 @@
 
 
 #ifndef intrsc_attrs
+#ifdef __INTEL_COMPILER
+#   define intrsc_attrs __attribute__((__gnu_inline__, __always_inline__, __artificial__)) //, __artificial__
+#else
 #   define intrsc_attrs __attribute__((__gnu_inline__, __always_inline__, __nodebug__)) //, __artificial__
+#endif
 #endif
 
 #ifndef static_inline
