@@ -26,20 +26,26 @@ void set_random_keys_and_values(
     size_t index;
 
     static _t(((entry_t){}).key) (*const rand_key)() = (void *)
-        comp_select(_s(*keys) == 4, &rand,
-        comp_select(_s(*keys) == 8, &rand_64,
-            (void)0));
+#       ifdef __INTEL_COMPILER
+            &rand_64
+#       else
+            comp_select(_s(*keys) == 4, &rand,
+            comp_select(_s(*keys) == 8, &rand_64,
+                (void)0))
+#       endif
+        ;
 
     for (index = 0; index < cnt; index++) {
         values[index] = (_t(*values))rand_64();
         keys[index] = sorted_keys[index] = rand_key();
+//        keys[index] = sorted_keys[index] = (0x80000000ULL + ((size_t)index * 2));
+//        keys[index] = sorted_keys[index] = (index + 2);
     }
 
     qsort(sorted_keys, cnt, sizeof(*keys), key_diff);
-
     for (index = 1; index < cnt; index++)
         if (sorted_keys[index] == sorted_keys[index - 1])
-            printf("duplicate keys: %lu @%lu\n", (unsigned long)(keys[index]), (unsigned long)index), exit(-1);
+            sorted_keys[index]++;
 
     printf(
         "range: %'llu - %'llu\n"
