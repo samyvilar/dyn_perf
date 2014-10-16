@@ -6,6 +6,10 @@
 #include "mt_rand.h"
 #include "scalrs.h"
 
+#include "entry.h"
+#include "vect.h"
+#include "sse2.h"
+
 
 #define MAX_PRIME_8         (unsigned char)255  // <<<< largest 8 bit prime number ...
 #define MAX_SQRT_PRIME_8    (unsigned char)13   // <<<< largest 8 bit prime that is less than sqrt(2**8)
@@ -62,6 +66,51 @@
     ) % max_prime(type_or_expr)) | (typeof(type_or_expr))1)
 
 #define hash_univ_pow2(key, coef, irlvnt_bits) (((key) * (coef)) >> (irlvnt_bits))
+
+typedef struct hashr_t {
+    vect_lrgst_intgl_type
+        coef,
+        irrlvnt_bits,
+        curr;
+} hashr_t;
+
+static_inline void hashr_init_coef(hashr_t *self, _t((entry_t){}.key) coef) {
+    self->coef = ((vect_lrgst_intgl_type (*)(_t(coef)))vect.lrgst.intgl.ops->brdcst[_s(coef)])(coef);
+}
+
+
+static_inline hashr_t *hashr_init(hashr_t *self, _t((entry_t){}.key) coef, unsigned char irrlvnt_bits) {
+    hashr_init_coef(self, coef);
+
+    self->irrlvnt_bits = ((vect_lrgst_intgl_type (*)(unsigned long))vect.lrgst.intgl.ops->brdcst[_s(long)])(
+        (unsigned long)irrlvnt_bits
+    );
+    return self;
+}
+
+static_inline void hashr_fill(hashr_t *self, entry_t **keys, const size_t cnt) {
+
+}
+
+//static_inline _t((entry_t){}.key) hashr_get(hashr_t *self, const int index) {
+//    typedef vect_lrgst_intgl_type oprn_t;
+//    typedef _t((entry_t){}.key) memb_t;
+//
+//    return ((memb_t (*)(oprn_t, const int))vect.lrgst.intgl.ops->get[_s(memb_t)])(self->curr, index);
+//
+//}
+
+static_inline vect_lrgst_intgl_type hashes(hashr_t *self, const _t((entry_t){}.key) *keys) {
+    typedef vect_lrgst_intgl_type oprn_t;
+    typedef _t(*keys) memb_t;
+
+    oprn_t (*const load)(const memb_t *)  = (_t(load))vect.lrgst.intgl.ops->load_align;
+    oprn_t (*const mul) (oprn_t, oprn_t)  = vect.lrgst.intgl.ops->mul[_s(memb_t)];
+    oprn_t (*const rshft)(oprn_t, oprn_t) = vect.lrgst.intgl.ops->rshft_lgcl[_s(memb_t)];
+
+    return rshft(mul(self->coef, load(keys)), self->irrlvnt_bits);
+}
+
 
 
 #endif
