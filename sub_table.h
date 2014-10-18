@@ -9,6 +9,13 @@
 #include "entries.h"
 #include "fld.h"
 
+#define table_pack_stats_t struct {\
+unsigned char                      \
+    irrlvnt_bits,                  \
+    len_log2,                      \
+    cnt,                           \
+    capct;                         \
+}
 
 typedef struct table_t {
     union {
@@ -20,16 +27,9 @@ typedef struct table_t {
         coef;
 
     union {
-        struct {
-            unsigned char
-                irrlvnt_bits,
-                len_log2,
-                cnt,
-                capct;
-        };
+        table_pack_stats_t ;
 
-        unsigned
-            stats;
+        unsigned packd_stats;
     };
 } table_t;
 

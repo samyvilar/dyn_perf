@@ -13,19 +13,32 @@ static const struct {
         initial_len_log2,
         initial_irrlvnt_bits;
 
-    const _t(((table_t){}).stats)
+    const _t(((table_t){}).packd_stats)
         table_build_2_stats;
 } sub_table = {
-#   define SUB_TABLE_INITIAL_LEN_LOG2 2
-    .initial_len_log2 = SUB_TABLE_INITIAL_LEN_LOG2,
-    .initial_irrlvnt_bits = (bit_sz(((table_t){}).coef) - SUB_TABLE_INITIAL_LEN_LOG2),
-    .table_build_2_stats =
-        ((bit_sz(((table_t){}).coef) - SUB_TABLE_INITIAL_LEN_LOG2))
-        | (SUB_TABLE_INITIAL_LEN_LOG2 << 8)
-        | (2 << 16) // count intial count ...
-        | (2 << 24)
 
-#   undef SUB_TABLE_INITIAL_LEN_LOG2
+#   define SUB_TABLE_INITL_LEN_LOG2 2
+
+    .initial_len_log2       = SUB_TABLE_INITL_LEN_LOG2,
+    .initial_irrlvnt_bits   = (bit_sz(((table_t){}).coef) - SUB_TABLE_INITL_LEN_LOG2),
+
+#   define lens_log2_to_capct(len_log2)  \
+        comp_select(len_log2 == 2,  2,   \
+        comp_select(len_log2 == 4,  4,   \
+        comp_select(len_log2 == 6,  8,   \
+        comp_select(len_log2 == 8,  16,  \
+        comp_select(len_log2 == 10, 32,  \
+        comp_select(len_log2 == 12, 64,  \
+            (void)0))))))
+
+    .table_build_2_stats  =
+            ((bit_sz(((table_t){}).coef) - SUB_TABLE_INITL_LEN_LOG2) << bit_offst(_t(table_pack_stats_t), irrlvnt_bits))
+        | (SUB_TABLE_INITL_LEN_LOG2 << bit_offst(_t(table_pack_stats_t), len_log2))
+        | (2 << bit_offst(_t(table_pack_stats_t), cnt))
+        | (lens_log2_to_capct(SUB_TABLE_INITL_LEN_LOG2) << bit_offst(_t(table_pack_stats_t), capct))
+
+#   undef lens_log2_to_capct
+#   undef SUB_TABLE_INITL_LEN_LOG2
 };
 
 
@@ -35,7 +48,7 @@ table_t *table_build_2(entry_t *entry_a, entry_t *entry_b) {
 
     table_t *const self = table_alloc();
 
-    self->stats = sub_table.table_build_2_stats;
+    self->packd_stats = sub_table.table_build_2_stats;
     self->slots = entries_pow2_new(sub_table.initial_len_log2);
 
     hashr_t *hashr = hashr_init(&(hashr_t){}, (self->coef = hash_rand_coef(self->coef)), self->irrlvnt_bits);
