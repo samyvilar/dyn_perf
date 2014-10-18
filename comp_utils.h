@@ -3,6 +3,7 @@
 #define __COMP_ERROR__
 
 #include <assert.h>
+#include <stddef.h>
 
 #ifndef _t
 #   define _t typeof
@@ -14,6 +15,10 @@
 
 #ifndef bit_sz
 #   define bit_sz(type) (_s(type) * 8)
+#endif
+
+#ifndef bit_offst
+#   define bit_offst(tp, memb) (offsetof(tp, memb) * CHAR_BIT)
 #endif
 
 #ifndef array_cnt
