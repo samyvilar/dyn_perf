@@ -147,31 +147,37 @@ static const struct {
         },
 
         .get = {
+            [2] = &_mm_extract_epi16,
             [4] = &_mm_extrt_epi32,
             [8] = &_mm_extrt_epi64
         },
 
         .set = {
+            [2] = &_mm_set_epi16,
             [4] = &_mm_set_epi32,
             [8] = &_mm_set_epi64x
         },
 
         .rshft_lgcl_imm = {
+            [2] = &_mm_srli_epi16,
             [4] = &_mm_srli_epi32,
-            [8] = &_mm_srli_epi16
+            [8] = &_mm_srli_epi64
         },
 
         .rshft_lgcl = {
+            [2] = &_mm_srl_epi16,
             [4] = &_mm_srl_epi32,
             [8] = &_mm_srl_epi64
         },
 
         .lshft_imm = {
+            [2] = &_mm_slli_epi16,
             [4] = &_mm_slli_epi32,
             [8] = &_mm_slli_epi64
         },
 
         .lshft = {
+            [2] = &_mm_sll_epi16,
             [4] = &_mm_sll_epi32,
             [8] = &_mm_sll_epi64
         },
@@ -187,6 +193,7 @@ static const struct {
         },
 
         .mul = {
+            [2] = &_mm_mullo_epi16,
             [4] = &_mm_mullo_epi32,
             [8] = &_mm_mullo_epi64
         },
