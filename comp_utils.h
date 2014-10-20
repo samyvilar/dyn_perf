@@ -18,7 +18,7 @@
 #endif
 
 #ifndef bit_offst
-#   define bit_offst(tp, memb) (offsetof(tp, memb) * CHAR_BIT)
+#   define bit_offst(tp, memb) (offsetof(_t(tp), memb) * CHAR_BIT)
 #endif
 
 #ifndef array_cnt
