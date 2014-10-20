@@ -32,17 +32,23 @@ static_inline entry_t *entry_new(const _t(((entry_t){}).key) key, const _t(((ent
     return self;
 }
 
-static_inline _t(((entry_t){}).item) entry_query(const entry_t *const self, const _t(((entry_t){}).key) key) {
-//    return (self->key == key) ? self->item : 0;
-    return
-        (_t(((entry_t){}).item))scalr_switch_oblvs_sign_intgl(
-            key,
-            ~((signed long long)((self->key - key)  | (key - self->key)) >> 63) & (unsigned long long)self->item,
-            ~((signed int)((self->key - key)        | (key - self->key)) >> 31) & (unsigned)self->item,
-            ~((signed short)((self->key - key)      | (key - self->key)) >> 15) & (unsigned short)self->item,
-            ~((signed char)((self->key - key)       | (key - self->key)) >>  7) & (unsigned char)self->item,
-            (void)0
-        );
+static_inline _t(((entry_t){}).item) entry_query(entry_t * self, _t(((entry_t){}).key) key) {
+
+    return (self->key == key) ? self->item : empty_entry->item;
+
+//    return (_t(entry_query(self, key))) comp_select(
+//        _s(key) != _s(self->item), ({
+//            const uword_t query = key, other = self->key;
+//              ~((word_t)((query - other) | (other - query)) >> (bit_sz(query) - 1)) & (uword_t)self->item;
+//        }),
+//        scalr_switch_oblvs_sign_intgl(
+//            key,
+//            ~((long long)((self->key - key) | (key - self->key)) >> (bit_sz(long long) - 1)) & (unsigned long long)self->item,
+//            ~((int)((self->key - key)       | (key - self->key)) >> (bit_sz(int) - 1)) & (unsigned)self->item,
+//            ~((short)((self->key - key)     | (key - self->key)) >> (bit_sz(short) - 1)) & (unsigned short)self->item,
+//            ~((char)((self->key - key)      | (key - self->key)) >> (bit_sz(char) - 1)) & (unsigned char)self->item,
+//            (void)0
+//        ));
 }
 
 
