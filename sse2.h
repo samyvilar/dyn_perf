@@ -141,7 +141,7 @@ static const struct {
         .setzeros       = &_mm_setzero_si128,
 
         .brdcst = {
-            [0] = sse_error_not_implemented,
+            [2] = (void *)&_mm_set1_epi16,
             [4] = (void *)&_mm_set1_epi32,
             [8] = (void *)&_mm_set1_epi64x
         },
