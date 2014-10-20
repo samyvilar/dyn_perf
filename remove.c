@@ -16,17 +16,17 @@ void dyn_perf_delitem(dyn_perf_t *const self, const _t(((entry_t){}).key) key) {
     if (*other == empty_entry || (*other)->key != key)
         return ;
 
-    self->cnt--;
     entry_recl(*other);
     *other = (void *)empty_entry;
 
-    if (is_sub_table && !--(self->slots[id].table->cnt)) {
+    if (is_sub_table && --(self->slots[id].table->cnt) == (_t(self->slots[id].table->cnt))1) {
         fld_flip(self->entry_type, id);
-        table_recl(self->slots[id].table);
-        self->slots[id].entry = (void *)empty_entry;
+        table_t *table = self->slots[id].table;
+        entrs_coll_clr(table->slots, &self->slots[id].entry, 1);
+        table_recl(table);
     }
 
-    if ((self->len_log2 > dyn_perf.initial_length_log2) && (self->cnt < dyn_perf_thrshld(self))) {
+    if (--self->cnt < dyn_perf_thrshld(self) && self->len_log2 > dyn_perf.initial_length_log2) {
         self->irrlvnt_bits++;
         dyn_perf_rebuild(self, self->len_log2--);
     }
