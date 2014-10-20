@@ -22,13 +22,12 @@ static_inline entry_t **entries_pow2_align_alloc(const unsigned char id) {
 static_inline entry_t **entries_pow2_align_init(entry_t **self, const unsigned char id) {
     typedef lrgst_vect_ingtl_t oprn_t;
 
-    void (*const set)(oprn_t *, oprn_t)     = vect.lrgst.intgl.ops->store_align;
+    void (*const store)(oprn_t *, oprn_t)     = vect.lrgst.intgl.ops->store_align;
     oprn_t (*const brdcst)(_t(empty_entry)) = vect.lrgst.intgl.ops->brdcst[_s(empty_entry)];
 
-    size_t index;
-    const size_t len = calc_len_log2(id, log2[_s(oprn_t)/_s(word_t)]);
-
-    for (index = 0; index < len; set(&((oprn_t *)self)[index++], brdcst(empty_entry))) ;
+    const oprn_t pattrn = brdcst(empty_entry);
+    size_t len;
+    for (len = calc_len_log2(id, log2_frm_pow2[_s(oprn_t)/_s(word_t)]); len--; store(&((oprn_t *)self)[len], pattrn)) ;
 
     return self;
 }
