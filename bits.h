@@ -106,22 +106,20 @@ static_inline unsigned short intrsc_attrs __builtin_popcounts(unsigned short x) 
 #define bits_trln_one(x)  singl_param_integral_macro(bits_trlng_one_, x, unsigned)
 #define bits_cnt_ones(x)  singl_param_integral_macro(bits_cnt_ones_, x, unsigned)
 
-#define _leadn_one_index_asm(x, imm_byt_size) ({asm (att_instr(bsr, imm_byt_size) " %0, %0" : "=r" (x) : "0"(x));})
-static __inline__ unsigned long __builtin_ldn_one_indx_ll(unsigned long a) {
-    _leadn_one_index_asm(a, 8);
-    return a;
-}
-#define _leadn_one_index_asm(x, imm_byt_size) ({asm (att_instr(bsr, imm_byt_size) " %0, %0" : "=r" (x) : "0"(x));})
-#define bits_leadn_one(x) ({            \
-    _t(x) dest = (x);                   \
-    scalr_switch_on_byte_size(          \
-        dest,                           \
-        _leadn_one_index_asm(dest, 8),  \
-        _leadn_one_index_asm(dest, 4),  \
-        _leadn_one_index_asm(dest, 2),  \
-        _leadn_one_index_asm(dest, 1),  \
-        (void)0                         \
-    ); dest; })                         \
+#define _leadn_one_index_asm(x, imm_byt_size) ({    \
+    _t(x) dest = (x);                               \
+    asm (att_instr(bsr, imm_byt_size) " %0, %0" : "=r" (dest) : "0"(dest));\
+    dest; })
+
+#define bits_leadn_one(x)            \
+    scalr_switch_on_byte_size(       \
+        x,                           \
+        _leadn_one_index_asm(x, 8),  \
+        _leadn_one_index_asm(x, 4),  \
+        _leadn_one_index_asm(x, 2),  \
+        _leadn_one_index_asm(x, 1),  \
+        (void)0                      \
+    )
 /*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  * Returns the position of the leading one,
  *  generates a single instruction bsr
