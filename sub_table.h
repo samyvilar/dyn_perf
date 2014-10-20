@@ -57,14 +57,57 @@ static_inline void sub_table_cleand_recl(table_t *const self) {
 
 
 static_inline void entrs_coll_clr(entry_t **src, entry_t **dest, size_t cnt) {
-    _t(cnt) curr;
-    for (curr = 0; cnt; src[curr++] = (void *)empty_entry) {
-        for (; empty_entry == src[curr]; curr++) ;
-        dest[--cnt] = src[curr];
+    for (src--; cnt--; *src = (void *)empty_entry) {
+        while (empty_entry == *++src) ;
+
+        *dest++ = *src;
     }
 }
 
 
+static_inline void sub_table_find_coef(
+    table_t            *self,
+    hashr_t            *params,
+    _t(((entry_t){}).key) src[],
+    _t(((entry_t){}).key) dest[],
+    const size_t item_cnt
+) {
+    _t(((fld_t *)NULL)->word) buff[fld_len(self->len_log2)] __attribute__((aligned(sizeof(lrgst_vect_ingtl_t))));
+    fld_t *set;
+    unsigned char cnt;
+
+    restart:
+        set = mem_clr_align(buff, _s(set));
+        hashes(params, (void *)src, (void *)dest, item_cnt);
+        for (cnt = self->cnt; cnt--; fld_flip(set, dest[cnt])) ;
+
+        if (fld_cnt(set, self->len_log2) == self->cnt)
+            return ;
+
+        hashr_init_coef(params, self->coef = hash_rand_coef(self->coef));
+    goto restart;
+}
+
+static_inline void small_sub_table_find_coef(
+    table_t *self,
+    hashr_t *params,
+    _t(((entry_t){}).key) src[],
+    _t(((entry_t){}).key) dest[],
+    const size_t item_cnt
+) {
+    unsigned long set;
+    unsigned char cnt;
+
+    restart:
+        hashes(params, (void *)src, (void *)dest, item_cnt);
+        for ((set = 0UL), (cnt = self->cnt); cnt--; set ^= 1UL << dest[cnt]) ;
+
+        if (bits_cnt_ones(set) == self->cnt)
+            return ;
+
+        hashr_init_coef(params, self->coef = hash_rand_coef(self->coef));
+    goto restart;
+}
 
 static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *append, unsigned short id) {
     typedef lrgst_vect_ingtl_t      oprn_t;
@@ -77,51 +120,21 @@ static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *appe
     entrs_coll_clr(self->slots, &entries[2], self->cnt - 2);
     entries_pow2_recl_cleand(self->slots, id);
 
-    memb_t keys[self->cnt] __attribute__((aligned(sizeof(oprn_t))));
-    for (id = 0; id < self->cnt; id++)
-        keys[id] = entries[id]->key;
+    const size_t key_cnt = self->cnt + ((_s(oprn_t)/_s(memb_t)) - (self->cnt % (_s(oprn_t)/_s(memb_t))));
+    memb_t keys[key_cnt] __attribute__((aligned(sizeof(oprn_t))));
+    for (id = self->cnt; id--; keys[id] = entries[id]->key) ;
 
+    _t(keys) buff;
 
-    oprn_t ids;
-    unsigned char cnt;
-    const _t(cnt) termnl = self->cnt - (self->cnt % (_s(oprn_t)/_s(memb_t)));
+    ((self->len_log2 > log2_frm_pow2[bit_sz(unsigned long)]) ? sub_table_find_coef : small_sub_table_find_coef)(
+        self,
+        hashr_init(&(hashr_t){}, self->coef = hash_rand_coef(self->coef), self->irrlvnt_bits),
+        keys,
+        buff,
+        key_cnt/(_s(oprn_t)/_s(memb_t))
+    );
 
-    hashr_t *hash_buff = hashr_init(&(hashr_t){}, self->coef = hash_rand_coef(self->coef), self->irrlvnt_bits);
-    fld_t *const set = fld_pow2_new(self->len_log2);
-
-    memb_t (*const get)(oprn_t, const int) = (_t(get))vect.lrgst.intgl.ops->get[_s(memb_t)];
-
-    restart:
-    for (cnt = 0 ; cnt < termnl; cnt += _s(oprn_t)/_s(memb_t)) {
-        ids = hashes(hash_buff, &keys[cnt]);
-
-        for (id = 0; id < _s(oprn_t)/_s(memb_t); id++) {
-            unsigned short curr = get(ids, id);
-            fld_flip(set, curr);
-            if (fld_get(set, curr))
-                continue;
-            fld_clr(set, self->len_log2);
-            hashr_init_coef(hash_buff, self->coef = hash_rand_coef(self->coef));
-            goto restart;
-        }
-    }
-    for ( ; cnt < self->cnt; cnt++) {
-        id = sub_table_hash(self, keys[cnt]);
-        fld_flip(set, id);
-        if (fld_get(set, id))
-            continue ;
-        fld_clr(set, self->len_log2);
-        hashr_init_coef(hash_buff, self->coef = hash_rand_coef(self->coef));
-        goto restart;
-    }
-
-    self->slots = entries_pow2_new(self->len_log2);
-    for (cnt = 0; cnt < termnl; cnt += _s(oprn_t)/_s(memb_t))
-        for ((ids = hashes(hash_buff, &keys[cnt])), (id = 0); id < _s(oprn_t)/_s(memb_t); id++)
-            self->slots[get(ids, id)] = entries[id + cnt];
-
-    for ( ; cnt < self->cnt; cnt++)
-        self->slots[sub_table_hash(self, keys[cnt])] = entries[cnt];
+    for ((self->slots = entries_pow2_new(self->len_log2)), (id = self->cnt); id--; self->slots[buff[id]] = entries[id]) ;
 }
 
 

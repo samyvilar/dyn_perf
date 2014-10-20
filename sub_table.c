@@ -32,10 +32,10 @@ static const struct {
             (void)0))))))
 
     .table_build_2_stats  =
-            ((bit_sz(((table_t){}).coef) - SUB_TABLE_INITL_LEN_LOG2) << bit_offst(_t(table_pack_stats_t), irrlvnt_bits))
-        | (SUB_TABLE_INITL_LEN_LOG2 << bit_offst(_t(table_pack_stats_t), len_log2))
-        | (2 << bit_offst(_t(table_pack_stats_t), cnt))
-        | (lens_log2_to_capct(SUB_TABLE_INITL_LEN_LOG2) << bit_offst(_t(table_pack_stats_t), capct))
+          ((bit_sz(((table_t){}).coef) - SUB_TABLE_INITL_LEN_LOG2) << bit_offst(table_pack_stats_t, irrlvnt_bits))
+        | (SUB_TABLE_INITL_LEN_LOG2 << bit_offst(table_pack_stats_t, len_log2))
+        | (2 << bit_offst(table_pack_stats_t, cnt))
+        | (lens_log2_to_capct(SUB_TABLE_INITL_LEN_LOG2) << bit_offst(table_pack_stats_t, capct))
 
 #   undef lens_log2_to_capct
 #   undef SUB_TABLE_INITL_LEN_LOG2
@@ -51,17 +51,21 @@ table_t *table_build_2(entry_t *entry_a, entry_t *entry_b) {
     self->packd_stats = sub_table.table_build_2_stats;
     self->slots = entries_pow2_new(sub_table.initial_len_log2);
 
-    hashr_t *hashr = hashr_init(&(hashr_t){}, (self->coef = hash_rand_coef(self->coef)), self->irrlvnt_bits);
+    oprn_t (*const load)(memb_t *)  = (_t(load))vect.lrgst.intgl.ops->load_align;
+    oprn_t (*const mul) (oprn_t, oprn_t)  = vect.lrgst.intgl.ops->mul[_s(memb_t)];
+    oprn_t (*const rshft)(oprn_t, const int) = vect.lrgst.intgl.ops->rshft_lgcl_imm[(_s(memb_t))];
+    oprn_t (*const brcst)(memb_t) = vect.lrgst.intgl.ops->brdcst[_s(memb_t)];
+    memb_t (*const get)(oprn_t, const int) = vect.lrgst.intgl.ops->get[_s(memb_t)];
 
-    const memb_t keys[_s(oprn_t)/_s(memb_t)] __attribute__((aligned(sizeof(oprn_t)))) = {entry_a->key, entry_b->key};
+    memb_t buff[_s(oprn_t)/_s(memb_t)] __attribute__((aligned(_s(oprn_t)))) = {entry_a->key, entry_b->key};
+    oprn_t ids, keys = load(buff);
 
-    memb_t (*const get)(oprn_t, const int) = (_t(get))vect.lrgst.intgl.ops->get[_s(memb_t)];
-    oprn_t buffr;
-    for (buffr = hashes(hashr, keys); get(buffr, 0) == get(buffr, 1); buffr = hashes(hashr, keys))
-        hashr_init_coef(hashr, self->coef = hash_rand_coef(self->coef));
+    self->coef = hash_rand_coef(self->coef);
+    for (ids = rshft(mul(keys, brcst(self->coef)), sub_table.initial_irrlvnt_bits); get(ids, 0) == get(ids, 1); ids = rshft(mul(keys, brcst(self->coef)), sub_table.initial_irrlvnt_bits))
+        self->coef = hash_rand_coef(self->coef);
 
-    self->slots[get(buffr, 0)] = entry_a;
-    self->slots[get(buffr, 1)] = entry_b;
+    self->slots[get(ids, 0)] = entry_a;
+    self->slots[get(ids, 1)] = entry_b;
 
     return self;
 }
