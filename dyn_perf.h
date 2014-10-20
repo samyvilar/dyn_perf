@@ -13,7 +13,6 @@
 
 #include "vect.h"
 
-
 typedef struct dyn_perf_t {
     union {
         struct dyn_perf_t *_next;
@@ -31,11 +30,9 @@ typedef struct dyn_perf_t {
         cnt;
 
     union {
-        struct {
-            unsigned char
-                irrlvnt_bits,
-                len_log2;
-        };
+#       define dyn_perf_stats_t struct {unsigned char irrlvnt_bits, len_log2;}
+
+        dyn_perf_stats_t ;
         unsigned short stats;
     };
 
@@ -53,13 +50,15 @@ static const struct {
     const unsigned short initial_stats;
 } dyn_perf = {
     .factors = {
-        .expand = 0.6, // expand when ratio between items and length exceeds    60%
-        .shrink = 0.2 // shrink when ratio between items and length drops below 20%
+        .expand = 0.6, // expand when ratio between items and length exceeds  60%
+        .shrink = 0.2  // shrink when ratio between items and length subceeds 20%
     },
-#define INITIAL_LENGTH_LOG2     2
-    .initial_length_log2 = INITIAL_LENGTH_LOG2, //24 //bit_sz(((fld_t){}).words[0])
-    .initial_stats       = (bit_sz(((dyn_perf_t){}).coef) - INITIAL_LENGTH_LOG2) | (INITIAL_LENGTH_LOG2 << 8)
-#undef INITIAL_LENGTH_LOG2
+#define DYN_PERF_INIT_LEN_LOG2     2
+    .initial_length_log2 = DYN_PERF_INIT_LEN_LOG2, //24 //bit_sz(((fld_t){}).words[0])
+    .initial_stats =
+        ((bit_sz(((dyn_perf_t){}).coef) - DYN_PERF_INIT_LEN_LOG2) << bit_offst(dyn_perf_stats_t, irrlvnt_bits))
+      | (DYN_PERF_INIT_LEN_LOG2 << bit_offst(dyn_perf_stats_t, len_log2))
+#undef DYN_PERF_INIT_LEN_LOG2
 };
 
 
@@ -72,11 +71,8 @@ static const struct {
 static_inline dyn_perf_t *dyn_perf_new() {
     dyn_perf_t *const self = dyn_perf_alloc();
 
-    self->cnt  = 0;
-    self->coef = hash_rand_coef(self->coef);
-
-//    self->irrlvnt_bits  = bit_sz(self->coef) - dyn_perf.initial_length_log2;
-//    self->len_log2      = dyn_perf.initial_length_log2;
+    self->cnt   = 0;
+    self->coef  = hash_rand_coef(self->coef);
     self->stats = dyn_perf.initial_stats;
 
     self->slots      = (void *)entries_pow2_new(dyn_perf.initial_length_log2);
@@ -93,32 +89,29 @@ static_inline _t(((entry_t){}).key) dyn_perf_hash(const dyn_perf_t *const self, 
 #define dyn_perf_entry_is_table(self, index)     fld_get((self)->entry_type, index)
 
 
-static_inline entry_t **dyn_perf_cln_entrs(dyn_perf_t *self, entry_t **dest, unsigned char id) {
-    size_t curr, cnt = 0;
-    const size_t len = fld_len(self->entry_type, id);
+static_inline entry_t **dyn_perf_cln_entrs(dyn_perf_t *self, entry_t **dest, unsigned char id)
+{
+    typedef _t(self->entry_type->word) wrd_t;
+    _t(self->cnt) curr, cnt = self->cnt;
 
-    _t(self->entry_type->word) word;
-    for (curr = 0; curr < len; self->entry_type[curr++].word = 0)
-        for (word = self->entry_type[curr].word; word; word &= (word - (_t(word))1))
-        {
-            _t(self->slots[0]) *const slot = &self->slots[(curr << log2[bit_sz(word)]) + bits_trlng_zrs(word)];
+    for (curr = fld_len(id); curr--; self->entry_type[curr].word = 0)
+    {
+        _t(self->entry_type->word) word;
+        _t(self->slots) slots = &self->slots[curr << log2_frm_pow2[bit_sz(word)]];
 
-            entrs_coll_clr(slot->table->slots, &dest[cnt], slot->table->cnt);
+        for (word = self->entry_type[curr].word; word; word ^= (_t(word))1 << id) {
+            id = bits_leadn_one(word);
 
-            cnt += slot->table->cnt;
-            sub_table_cleand_recl(slot->table);
-            slot->entry = (void *)empty_entry;
+            entrs_coll_clr(slots[id].table->slots, &dest[cnt -= slots[id].table->cnt], slots[id].table->cnt);
+            sub_table_cleand_recl(slots[id].table);
+            slots[id].entry = (void *)empty_entry;
         }
-
-    for (curr = 0; cnt < self->cnt; curr++) {
-        for (; empty_entry == self->slots[curr].entry; curr++) ;
-
-        dest[cnt++] = self->slots[curr].entry;
-        self->slots[curr].entry = (void *)empty_entry;
     }
+    entrs_coll_clr(&self->slots->entry, dest, cnt);
 
     return dest;
 }
+
 
 void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id);
 
@@ -168,6 +161,14 @@ static_inline _t(((entry_t){}).item) dyn_perf_getitem(const dyn_perf_t *const se
             : self->slots[id].entry,
         key
     );
+}
+
+static_inline entry_t *dyn_perf_entry(dyn_perf_t *const self, const _t(((entry_t) {}).key) key) {
+    const _t(dyn_perf_hash(self, key)) id = dyn_perf_hash(self, key);
+
+    return
+        fld_get(self->entry_type, id) ? self->slots[id].table->slots[sub_table_hash(self->slots[id].table, key)]
+                                      : self->slots[id].entry;
 }
 
 
