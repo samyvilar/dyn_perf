@@ -63,15 +63,13 @@
         rand_16(),                      \
         rand_8(),                       \
         (void)0                         \
-    ) % max_prime(type_or_expr)) | (typeof(type_or_expr))1)
+    ) /*% max_prime(type_or_expr)*/) | (typeof(type_or_expr))1)
 
 #define hash_univ_pow2(key, coef, irlvnt_bits) (((key) * (coef)) >> (irlvnt_bits))
 
 typedef struct hashr_t {
     vect_lrgst_intgl_type
-        coef,
-        irrlvnt_bits,
-        curr;
+        coef, irrlvnt_bits;
 } hashr_t;
 
 static_inline void hashr_init_coef(hashr_t *self, _t((entry_t){}.key) coef) {
@@ -88,27 +86,24 @@ static_inline hashr_t *hashr_init(hashr_t *self, _t((entry_t){}.key) coef, unsig
     return self;
 }
 
-static_inline void hashr_fill(hashr_t *self, entry_t **keys, const size_t cnt) {
+static_inline void *hashes(
+    hashr_t               *self,
+    vect_lrgst_intgl_type *src,
+    vect_lrgst_intgl_type *dest,
+    size_t                 cnt
+) {
+    typedef vect_lrgst_intgl_type   oprn_t;
+    typedef _t(((entry_t *)0)->key) memb_t;
 
-}
-
-//static_inline _t((entry_t){}.key) hashr_get(hashr_t *self, const int index) {
-//    typedef vect_lrgst_intgl_type oprn_t;
-//    typedef _t((entry_t){}.key) memb_t;
-//
-//    return ((memb_t (*)(oprn_t, const int))vect.lrgst.intgl.ops->get[_s(memb_t)])(self->curr, index);
-//
-//}
-
-static_inline vect_lrgst_intgl_type hashes(hashr_t *self, const _t((entry_t){}.key) *keys) {
-    typedef vect_lrgst_intgl_type oprn_t;
-    typedef _t(*keys) memb_t;
-
-    oprn_t (*const load)(const memb_t *)  = (_t(load))vect.lrgst.intgl.ops->load_align;
+    oprn_t (*const load)(void *)          = (_t(load))vect.lrgst.intgl.ops->load_align;
     oprn_t (*const mul) (oprn_t, oprn_t)  = vect.lrgst.intgl.ops->mul[_s(memb_t)];
     oprn_t (*const rshft)(oprn_t, oprn_t) = vect.lrgst.intgl.ops->rshft_lgcl[_s(memb_t)];
+    memb_t (*const store)(void *, oprn_t) = (_t(store))vect.lrgst.intgl.ops->store_align;
 
-    return rshft(mul(self->coef, load(keys)), self->irrlvnt_bits);
+    while (cnt--)
+        store(&dest[cnt], rshft(mul(self->coef, load(&src[cnt])), self->irrlvnt_bits));
+
+    return dest;
 }
 
 
