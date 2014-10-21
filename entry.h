@@ -12,7 +12,14 @@ typedef struct entry_t {
     union {
         struct entry_t *_next;
         struct {
-            unsigned long key;
+#           ifndef ENTRY_KEY_T
+                unsigned long
+#           else
+                ENTRY_KEY_T
+#               undef ENTRY_KEY_T
+#           endif
+
+                key;
             void *item;
         };
     };
