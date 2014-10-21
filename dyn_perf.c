@@ -70,7 +70,8 @@ void dyn_perf_delitem(dyn_perf_t *const self, const _t(((entry_t){}).key) key) {
     _t(self->entry_type->word) is_sub_table = fld_get(self->entry_type, id);
 
     entry_t **other =
-        is_sub_table ? &self->slots[id].table->slots[sub_table_hash(self->slots[id].table, key)]
+        is_sub_table
+            ? &self->slots[id].table->slots[sub_table_hash(self->slots[id].table, key)]
             : &self->slots[id].entry;
 
     if (*other == empty_entry || (*other)->key != key)
@@ -148,11 +149,12 @@ size_t dyn_perf_byt_consptn(dyn_perf_t *self) {
 }
 
 static inline table_t lrgst_sub_table(dyn_perf_t *self) {
-    table_t max = {{0}};
+    table_t max;
+    memset(&max, 0, _s(max));
 
-    _t(self->slots->entry->key) curr;
+    size_t curr;
     for (curr = 0; curr < dyn_perf_length(self); curr++)
-        if (dyn_perf_entry_is_table(self, curr) && (sub_table_length(self->slots[curr].table) > sub_table_length(&max)))
+        if (dyn_perf_entry_is_table(self, curr) && (self->slots[curr].table->len_log2 > max.len_log2))
             max = *(self->slots[curr].table);
 
     return max;
@@ -164,15 +166,15 @@ static inline  sub_tbl_cnts_t *compl_sub_table_stats(const dyn_perf_t *const sel
 
     size_t cnt = fld_cnt(self->entry_type, self->len_log2);
     size_t *indices = fld_entrs(self->entry_type, self->len_log2, malloc(_s(*indices) * cnt));
+    const table_t *table;
 
-    for (stats->cnt = cnt; cnt--; ) {
-        const table_t *const table = self->slots[indices[cnt]].table;
+    for (stats->cnt = cnt; cnt--; stats->freqncs[table->capct]++) {
+        table = self->slots[indices[cnt]].table;
 
         stats->slots   += sub_table_length(table);
         stats->entries += table->cnt;
 
         stats->items[table->capct] += table->cnt;
-        stats->freqncs[table->capct]++;
     }
 
     free(indices);
@@ -229,7 +231,7 @@ void test_dyn_perf(
         .cnt         = self->cnt,
         .capct       = {.items = dyn_perf_capct(self), .min = dyn_perf_thrshld(self)},
         .sub_table   = {
-            .length = sub_table_length(&max_sub_tbl),
+            .length = max_sub_tbl.len_log2 ? sub_table_length(&max_sub_tbl) : 0,
             .cnt    = max_sub_tbl.cnt,
             .capct  = max_sub_tbl.capct
         }

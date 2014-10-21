@@ -65,7 +65,15 @@
         (void)0                         \
     ) /*% max_prime(type_or_expr)*/) | (typeof(type_or_expr))1)
 
-#define hash_univ_pow2(key, coef, irlvnt_bits) (((key) * (coef)) >> (irlvnt_bits))
+static_inline _t(((entry_t *)0)->key) hash_univ_pow2(
+    register _t(((entry_t *)0)->key) id,
+    const _t(((entry_t *)0)->key)    coef,
+    const unsigned char              irlvnt_bits
+) {
+    id  *= coef;
+    id >>= irlvnt_bits;
+    return id;
+}
 
 typedef struct hashr_t {
     vect_lrgst_intgl_type

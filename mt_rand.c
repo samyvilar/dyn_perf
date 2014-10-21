@@ -122,7 +122,7 @@ typedef vect_lrgst_intgl_type (*const vect_mt_brdcst_64)(unsigned long long);
              upper_mask  = brdcst(mt_upper_mask(bit_mag))                       \
             ,lower_mask  = brdcst(mt_lower_mask(bit_mag))                       \
             ,odd_mask    = brdcst(mt_odd_mask(bit_mag))                         \
-            ,temp, temp1                                                        \
+            ,temp                                                               \
             ;                                                                   \
         static const unsigned short                                             \
             vect_states_cnt = mt_state_vector_cnt(&mt, oprn_t);                 \

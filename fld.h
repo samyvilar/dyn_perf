@@ -32,7 +32,7 @@ typedef union {uword_t word;} fld_t;
 fld_t *cleand_flds[comp_select(_s(void *) == 8, 44, 32)]; // 1,099,511,627,776  16 bit words ...
 
 static_inline size_t fld_len(const unsigned char id) {
-    return calc_len_log2(id, log2_frm_pow2[bit_sz(((fld_t *)NULL)->word)]);
+    return calc_len_log2(id, log2_frm_pow2[bit_sz(((fld_t *)0)->word)]);
 }
 static_inline fld_t *fld_pow2_new(unsigned id) {
     typedef _t(((fld_t *)0)->word) wrd_t;
@@ -88,15 +88,5 @@ static_inline size_t *fld_entrs(fld_t *self, const unsigned char id, size_t *des
 
     return dest;
 }
-
-//static_inline void fld_clr(fld_t *self, const unsigned char id) {
-//    size_t len;
-//    for (len = fld_len(id); len--; self[len].word = 0) ;
-//}
-
-//static_inline void fld_cln_entrs(fld_t *self, const unsigned char id, size_t *dest) {
-//    fld_entrs(self, id, dest);
-//    mem_clr_align(&self->word, _s(self->word) * fld_len(id));
-//}
 
 #endif

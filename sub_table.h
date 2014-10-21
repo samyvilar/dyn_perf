@@ -37,12 +37,12 @@ alloc_recl_sign_templs(table);
 
 
 #define sub_table_length(self)     (1 << (self)->len_log2)
-#define sub_table_entries_id(self) ((self)->len_log2)
+//#define sub_table_entries_id(self) ((self)->len_log2)
 
 #define sub_table_rand_coef(type)
 
 
-static_inline _t(((entry_t){}).key) sub_table_hash(const table_t *const self, const _t(((entry_t){}).key) key) {
+static_inline _t(((entry_t){}).key) sub_table_hash(const table_t *const self, _t(((entry_t){}).key) key) {
     return hash_univ_pow2(key, self->coef, self->irrlvnt_bits);
 }
 
@@ -77,7 +77,7 @@ static_inline void sub_table_find_coef(
     unsigned char cnt;
 
     restart:
-        set = mem_clr_align(buff, _s(set));
+        set = mem_clr_align(buff, _s(buff));
         hashes(params, (void *)src, (void *)dest, item_cnt);
         for (cnt = self->cnt; cnt--; fld_flip(set, dest[cnt])) ;
 

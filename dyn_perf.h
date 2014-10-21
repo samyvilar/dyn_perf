@@ -40,7 +40,7 @@ typedef struct dyn_perf_t {
 
 alloc_recl_sign_templs(dyn_perf);
 
-#define dyn_perf_length(self) ((_t((self)->slots->entry->key))1 << (self)->len_log2)
+#define dyn_perf_length(self) (1UL << (self)->len_log2)
 
 static const struct {
     struct {
@@ -81,8 +81,7 @@ static_inline dyn_perf_t *dyn_perf_new() {
     return self;
 }
 
-
-static_inline _t(((entry_t){}).key) dyn_perf_hash(const dyn_perf_t *const self, const _t(((entry_t){}).key) key) {
+static _t(((entry_t){}).key) dyn_perf_hash(const dyn_perf_t *const self, _t(((entry_t){}).key) key) {
     return hash_univ_pow2(key, self->coef, self->irrlvnt_bits);
 }
 

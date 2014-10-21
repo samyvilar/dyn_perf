@@ -448,22 +448,30 @@ static inline void *max_void_p(register const uword_t a, register const uword_t 
 //#define max max_by_subt
 
 
-
-//// min-max functions ... ********************************************************************
-//#define min_by_cmp(a, b)        (((a) < (b)) ? (a) : (b))
-//#define min_by_subt(a, b)    	((b) + (((a) - (b)) & sign_ext((a) - (b))))
-//#define min_by_xor(a, b)    	((b) ^ (((a) ^ (b)) & sign_bit_ext((a) - (b))))
+//#define min(_a, _b) ({  \
+//    _t(_b) b = (_b);    \
+//    _t(_a) a = (_a);    \
+//    _t(a + b) c = scalr_sign_ext(b - a)
 //
-//// a bit safer since the exprs are temporary copied and the exprs only appear twice withing the macro
-//#define min_by_subt_cpy(a, b)    ((typeof(a)[2]){(b), (a)}[sign_bit_bool((a) - (b))])
-//
-//#define min_p(a, b) ((void *)min(cast_ptr(a), cast_ptr(b)))
-//
-//#define min min_by_subt
+//})
 
 
-// the returned valued of two scalar expression a and b equal if a - b == 0 or  a xor b == 0,
-// otherwise a xor b != 0, it must have at least 1 set bit
+// unsigned min(|a|, |b|) == a if  a - |b| < 0,
+static_inline uword_t umin(const uword_t a, const uword_t b) {
+    return b ^ ((b ^ a) & ((word_t)(((~a + 1UL) - (~b + 1UL))) >> (bit_sz(a) - 1)));
+}
+static_inline uword_t umax(const uword_t a, const uword_t b) {
+    return a ^ ((b ^ a) & ((word_t)(((~a + 1UL) - (~b + 1UL))) >> (bit_sz(a) - 1)));
+}
+
+// min/max signed!!!! min(a, b) == a if a - b < 0 else b
+static_inline word_t min(const word_t a, const word_t b) { // 5 (branchless) instructions ...
+    return b ^ ((b ^ a) & ((a - b) >> (bit_sz(a) - 1)));
+}
+
+static_inline word_t max(const word_t a, const word_t b) {
+    return a ^ ((b ^ a) & ((word_t)(a - b) >> (bit_sz(a) - 1)));
+}
 
 
 
