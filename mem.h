@@ -39,11 +39,21 @@ scalr_switch_oblvs_sign_intgl(  \
 
 
 static_inline void *malloc_align(const size_t byte_cnt) {
-    void *const temp = malloc(byte_cnt + _s(lrgst_vect_ingtl_t));
-    return (void *)((uword_t)temp + (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t))));
+    void *temp = malloc(byte_cnt + _s(lrgst_vect_ingtl_t));
+
+    const word_t remndr = ((uword_t)temp % _s(lrgst_vect_ingtl_t));
+    temp += remndr ? (_s(lrgst_vect_ingtl_t) - remndr) : 0;
+
+    return temp;
+//    return (void *)((uword_t)temp + (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t))));
 }
-static_inline void free_align(void *const temp) {
-    free((void *)((uword_t )temp - (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t)))));
+static_inline void free_align(void *temp) {
+    if ((uword_t)temp % _s(vect_lrgst_intgl_type))
+        temp -= _s(vect_lrgst_intgl_type) - ((uword_t)temp % _s(vect_lrgst_intgl_type));
+
+    free(temp);
+
+//        free((void *)((uword_t )temp - (_s(lrgst_vect_ingtl_t) - ((uword_t)temp % _s(lrgst_vect_ingtl_t)))));
 }
 
 static_inline void *mem_clr_align(void *dest, const size_t byte_cnt) {
