@@ -57,6 +57,8 @@ table_t *table_build_2(entry_t *entry_a, entry_t *entry_b) {
     oprn_t (*const brcst)(memb_t) = vect.lrgst.intgl.ops->brdcst[_s(memb_t)];
     memb_t (*const get)(oprn_t, const int) = vect.lrgst.intgl.ops->get[_s(memb_t)];
 
+    comp_time_assrt(_s(oprn_t)/_s(memb_t) > 1);
+
     memb_t buff[_s(oprn_t)/_s(memb_t)] __attribute__((aligned(_s(oprn_t)))) = {entry_a->key, entry_b->key};
     oprn_t ids, keys = load(buff);
 
