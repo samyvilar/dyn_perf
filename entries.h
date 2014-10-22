@@ -19,10 +19,21 @@ static_inline entry_t **entries_pow2_align_alloc(const unsigned char id) {
     return malloc_align(_s(entry_t *) * ((size_t)1 << id));
 }
 
+static_inline void entries_release_alloc_blocks() {
+    unsigned char id;
+    entry_t **curr, **next;
+    for (id = array_cnt(cleand_entries); id--; cleand_entries[id] = NULL)
+        for (curr = cleand_entries[id]; curr; curr = next) {
+            next = (void *)*(entry_t ***)curr;
+            free_align(curr);
+        }
+}
+
+
 static_inline entry_t **entries_pow2_align_init(entry_t **self, const unsigned char id) {
     typedef lrgst_vect_ingtl_t oprn_t;
 
-    void (*const store)(oprn_t *, oprn_t)     = vect.lrgst.intgl.ops->store_align;
+    void (*const store)(oprn_t *, oprn_t)   = vect.lrgst.intgl.ops->store_align;
     oprn_t (*const brdcst)(_t(empty_entry)) = vect.lrgst.intgl.ops->brdcst[_s(empty_entry)];
 
     const oprn_t pattrn = brdcst(empty_entry);
@@ -49,6 +60,5 @@ static_inline void entries_pow2_recl_cleand(entry_t **self, const unsigned char 
     *(entry_t ***)self = cleand_entries[id];
     cleand_entries[id] = self;
 }
-
 
 #endif
