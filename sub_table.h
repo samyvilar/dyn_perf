@@ -120,7 +120,9 @@ static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *appe
     entrs_coll_clr(self->slots, &entries[2], self->cnt - 2);
     entries_pow2_recl_cleand(self->slots, id);
 
-    const size_t key_cnt = self->cnt + ((_s(oprn_t)/_s(memb_t)) - (self->cnt % (_s(oprn_t)/_s(memb_t))));
+    const size_t remndr = self->cnt % (_s(oprn_t)/_s(memb_t));
+    const size_t key_cnt = self->cnt + (remndr ? (_s(oprn_t) - remndr) : 0);
+
     memb_t keys[key_cnt] __attribute__((aligned(sizeof(oprn_t))));
     for (id = self->cnt; id--; keys[id] = entries[id]->key) ;
 
@@ -134,7 +136,8 @@ static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *appe
         key_cnt/(_s(oprn_t)/_s(memb_t))
     );
 
-    for ((self->slots = entries_pow2_new(self->len_log2)), (id = self->cnt); id--; self->slots[buff[id]] = entries[id]) ;
+    self->slots = entries_pow2_new(self->len_log2);
+    for (id = self->cnt; id--; self->slots[buff[id]] = entries[id]) ;
 }
 
 
