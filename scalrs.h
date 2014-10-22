@@ -303,20 +303,6 @@
     )
 
 
-// @@>> DO NOT CHANGE THIS ORDER!!!!
-//#define flts_sizes     (flt, 64), (flt, 32)
-//#define sints_sizes    (sint, 64), (sint, 32), (sint, 16), (sint, 8)
-//#define uints_sizes    (uint, 64), (uint, 32), (uint, 16), (uint, 8)
-//#define scalr_intlg_cnt 8
-
-//#define intgls_sizes   sints_sizes, uints_sizes
-//#define scalrs_params_kinds_sizes   flts_sizes, intgls_sizes
-/**************************************************************************/
-
-//#define type_bit_name_list(_kind_and_size) t_bit_name _kind_and_size
-//#define scalrs_names MAP_LIST(type_bit_name_list, scalrs_params_kinds_sizes)
-
-// select expression on scalars
 #define scalr_switch(               \
     expr,                           \
                                     \
@@ -413,64 +399,27 @@
 
 #define scalr_oper(oper) scalr_ ## oper
 
-#define scalr_is_zero(value)     ((value) == (_t(value))0)
-#define scalr_is_not_zero(value) ((value) != (_t(value))0)
 
-#define scalr_square(value)         ((value) * (value))
-#define scalr_doubl(value)          (2 * (value))
-#define scalr_half(value)           ((value) / 2)
-#define scalr_quartr(value)         ((value) / 4)
-
-#define scalr_is_not_pow_2(value)  (((value) & ((value) - 1)) != 0)
-#define scalr_is_pow_2(value)      (((value) & ((value) - 1)) == 0)
-
-
-#define max_by_cmp(a, b)        (((a) < (b)) ? (b) : (a))
-#define max_by_subt(a, b)		(a + ((b - a) & scalr_sign_ext(a - b)))
-#define max_by_xor(a, b)        (a ^ ((a ^ b) & scalr_sign_ext(a - b)))
-#define max_by_subt_cpy(a, b)   ((_t(a)[2]){(a), (b)}[sign_bit_bool((a) - (b))])
-
-#define scalr_max_by  max_by_xor
-
-static inline void *max_void_p(register const uword_t a, register const uword_t b) {
-    return (void *)scalr_max_by(a, b);
-//    return (void *)(a ^ ((a ^ b) & ((word_t)(a - b) >> ((sizeof(word_t) * (sizeof(char) * 8)) - 1))));
+static_inline uword_t abs_twos_cmplnt(const word_t a) {  // (branchless 3 instructions) take absolute value of a word using twos complement ..
+    const _t(a) sign_ones = scalr_sign_ext(a);
+    return (a ^ sign_ones) - sign_ones; // <<<< if a < 0 then ((a ^ -1) - -1) -> (~a + 1) else ((a ^ 0) - 0) -> (a)
 }
 
-#define scalr_max(a, b) ({              \
-    register const _t(b) expr_b = (b);  \
-    register const _t(a) expr_a = (a);  \
-    (comp_t_is_void_ptr(expr_a) || comp_t_is_void_ptr(expr_b))  \
-        ? max_void_p(cast_ptr(expr_a), cast_ptr(expr_b))        \
-        : scalr_max_by(expr_a, expr_b);                         \
-})
-
-//#define max max_by_subt
-
-
-//#define min(_a, _b) ({  \
-//    _t(_b) b = (_b);    \
-//    _t(_a) a = (_a);    \
-//    _t(a + b) c = scalr_sign_ext(b - a)
-//
-//})
-
-
-// unsigned min(|a|, |b|) == a if  a - |b| < 0,
-static_inline uword_t umin(const uword_t a, const uword_t b) {
-    return b ^ ((b ^ a) & ((word_t)(((~a + 1UL) - (~b + 1UL))) >> (bit_sz(a) - 1)));
-}
-static_inline uword_t umax(const uword_t a, const uword_t b) {
-    return a ^ ((b ^ a) & ((word_t)(((~a + 1UL) - (~b + 1UL))) >> (bit_sz(a) - 1)));
-}
-
-// min/max signed!!!! min(a, b) == a if a - b < 0 else b
 static_inline word_t min(const word_t a, const word_t b) { // 5 (branchless) instructions ...
-    return b ^ ((b ^ a) & ((a - b) >> (bit_sz(a) - 1)));
+    return b ^ ((b ^ a) & scalr_sign_ext(a - b));
+    //           b ^ a if a < b bc ^^ -> 0b11111 if a < b else 0 implying -> b <= a
+}
+static_inline word_t max(const word_t a, const word_t b) {
+    return a ^ ((b ^ a) & scalr_sign_ext(a - b));
 }
 
-static_inline word_t max(const word_t a, const word_t b) {
-    return a ^ ((b ^ a) & ((word_t)(a - b) >> (bit_sz(a) - 1)));
+
+static_inline uword_t umin(uword_t a, uword_t b) {
+    return a < b ? a : b;
+}
+
+static_inline uword_t umax(const uword_t a, const uword_t b) {
+    return a < b ? b : a;
 }
 
 
