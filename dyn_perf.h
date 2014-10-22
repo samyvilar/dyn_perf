@@ -181,4 +181,6 @@ void test_dyn_perf(
     ,const unsigned long       cnt
 );
 
+size_t dyn_perf_byt_consptn(dyn_perf_t *);
+
 #endif
