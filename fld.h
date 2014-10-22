@@ -34,6 +34,7 @@ fld_t *cleand_flds[comp_select(_s(void *) == 8, 44, 32)]; // 1,099,511,627,776  
 static_inline size_t fld_len(const unsigned char id) {
     return calc_len_log2(id, log2_frm_pow2[bit_sz(((fld_t *)0)->word)]);
 }
+
 static_inline fld_t *fld_pow2_new(unsigned id) {
     typedef _t(((fld_t *)0)->word) wrd_t;
 
@@ -44,19 +45,32 @@ static_inline fld_t *fld_pow2_new(unsigned id) {
 
         return self;
     }
-    if (_s(wrd_t) < _s(void *)) {
-        size_t len = calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]);
-        len += ((signed long)((len * _s(wrd_t)) - _s(void *)) >> (bit_sz(len) - 1)) & (_s(void *)/_s(wrd_t));
-        return calloc(len, _s(wrd_t));
-    }
 
-    return calloc(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), _s(wrd_t));
+    return comp_select(_s(wrd_t) < _s(void *),
+        calloc(
+            max(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), (_s(void *)/_s(wrd_t))),
+            _s(wrd_t)
+        ),
+        calloc(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), _s(wrd_t))
+    );
 }
 
 static_inline void fld_pow2_recl_clnd(fld_t *self, const unsigned id) {
     *(fld_t **)self = cleand_flds[id];
     cleand_flds[id] = self;
 }
+
+static_inline void fld_pow2_release_alloc_blocks() {
+    unsigned char id;
+    fld_t *curr, *next;
+    for (id = array_cnt(cleand_flds); id--; cleand_flds[id] = NULL)
+        for (curr = cleand_flds[id]; curr != NULL; curr = next) {
+            next = *(fld_t **)curr;
+            free(curr);
+        }
+}
+
+
 
 static_inline void fld_flip(fld_t *self, const size_t loc) {
     typedef _t(self[0].word) wrd_t;
@@ -71,8 +85,8 @@ static_inline _t(((fld_t){}).word) fld_get(fld_t *self, const size_t loc) {
 #define fld_byt_comspt(id) (_s(((fld_t *)NULL)->word) * fld_len(id))
 
 static_inline size_t fld_cnt(fld_t *self, const unsigned char id) {
-    size_t len, cnt;
-    for ((cnt = 0), (len = fld_len(id)); len--; cnt += bits_cnt_ones(self[len].word)) ;
+    size_t len, cnt = 0;
+    for (len = fld_len(id); len--; cnt += bits_cnt_ones(self[len].word)) ;
 
     return cnt;
 }
