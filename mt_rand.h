@@ -16,7 +16,7 @@
 #endif
 
 #ifndef bit_sz
-#   define bit_sz
+#   define bit_sz(a) (_s(a) * CHAR_BIT)
 #endif
 
 #define RAND_GEN_STATE_LENGTH 624U
