@@ -42,6 +42,7 @@
 //#define comp_error_init(msg) ({ assert_with_msg(0, msg); (void)0;})
 //#define comp_error_proc(expr) ({ _t(expr) __ = (expr); })
 
+#define comp_time_assrt(expr) ({typedef char __[!!(expr) - 1];})
 
 #define comp_select         __builtin_choose_expr
 //      ^^^^^^^^^^^ similar to ?: but requires the conditional to be an immdiate and the types aren't modified ...
