@@ -8,8 +8,7 @@
 #include "timed.h"
 #include "sub_table.h"
 #include "vect.h"
-#include "sse2.h"
-
+#include "mem.h"
 
 alloc_rec_templs(dyn_perf);
 
@@ -36,7 +35,7 @@ void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
     typedef _t(((entry_t){}).key)       memb_t;
     typedef lrgst_vect_ingtl_t          oprn_t;
 
-    entry_t **src = dyn_perf_cln_entrs(self, malloc(self->cnt * _s(self->slots->entry)), prev_id);
+    entry_t **const src = dyn_perf_cln_entrs(self, malloc(self->cnt * _s(self->slots->entry)), prev_id);
 
     entries_pow2_recl_cleand((entry_t **)self->slots, prev_id);
     fld_pow2_recl_clnd(self->entry_type, prev_id);
@@ -44,12 +43,12 @@ void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
     self->entry_type = fld_pow2_new(self->len_log2);
     self->slots = (_t(self->slots))entries_pow2_new(self->len_log2);
 
-    _t(self->cnt) curr;
-    memb_t *keys;
-    const size_t remndr = self->cnt % (_s(oprn_t)/_s(memb_t));
-    const size_t key_cnt = self->cnt + (remndr ? ((_s(oprn_t)/_s(memb_t)) - remndr) : 0);
+    const size_t
+        remndr = self->cnt % (_s(oprn_t)/_s(memb_t)),
+        key_cnt = self->cnt + (remndr ? ((_s(oprn_t)/_s(memb_t)) - remndr) : 0);
 
-    keys = malloc_align(key_cnt * _s(*keys));
+    memb_t *const keys = malloc(key_cnt * _s(*keys));
+    _t(self->cnt) curr;
     for (curr = self->cnt; curr--; keys[curr] = src[curr]->key) ;
 
     hashes(
@@ -59,10 +58,10 @@ void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
         key_cnt/(_s(oprn_t)/_s(memb_t))
     );
 
-    for (curr = 0; curr < self->cnt; curr++)
-        _dyn_perf_set_entry(self, keys[curr], src[curr]);
+    for (curr = self->cnt; curr--; _dyn_perf_set_entry(self, keys[curr], src[curr]))
+        ;
 
-    free_align(keys);
+    free(keys);
     free(src);
 }
 
@@ -87,7 +86,7 @@ void dyn_perf_delitem(dyn_perf_t *const self, const _t(((entry_t){}).key) key) {
         fld_flip(self->entry_type, id);
         table_t *table = self->slots[id].table;
         entrs_coll_clr(table->slots, &self->slots[id].entry, 1);
-        table_recl(table);
+        sub_table_cleand_recl(table);
     }
 
     if (--self->cnt < dyn_perf_thrshld(self) && self->len_log2 > dyn_perf.initial_length_log2) {
@@ -139,7 +138,7 @@ void dyn_perf_setitem(dyn_perf_t *const self, _t(((entry_t){}).key) id, const _t
 size_t dyn_perf_byt_consptn(dyn_perf_t *self) {
     size_t curr, cnt, lengths,
         total = _s(*self)
-            + dyn_perf_length(self) * _s(_t(self->slots[0]) *)
+            + dyn_perf_length(self) * _s(self->slots[0])
             + self->cnt * _s(entry_t)
             + fld_byt_comspt(self->len_log2)
             ;
