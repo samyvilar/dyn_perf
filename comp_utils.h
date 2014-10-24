@@ -38,9 +38,6 @@
 #   define static_inline static __inline__
 #endif
 
-#define assert_with_msg(expr, msg) assert((msg && (expr)))
-//#define comp_error_init(msg) ({ assert_with_msg(0, msg); (void)0;})
-//#define comp_error_proc(expr) ({ _t(expr) __ = (expr); })
 
 #define comp_time_assrt(expr) extern char __failed_assertion__[!!(expr) - 1]
 
