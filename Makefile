@@ -13,6 +13,8 @@ test:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) $(FILES) $(test_files) -DENTRY_KEY_T="unsigned short" -o test_16
 	$(MAKE) clean
+	$(CC) $(CFLAGS) $(FILES) $(test_files) -DENTRY_KEY_T="unsigned char" -o test_8
+	./test_8
 	./test_16
 	./test_32
 	./test_64
