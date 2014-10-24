@@ -18,7 +18,7 @@ test:
 	./test_16
 	./test_32
 	./test_64
-	rm -f test_16 test_32 test_64
+	rm -f test_8 test_16 test_32 test_64
 
 shared:
 	$(CC) $(CFLAGS) $(FILES) -fPIC -shared -o libdyn_perf.so
