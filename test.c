@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <locale.h>
 
 #include "dyn_perf.h"
 #include "sub_table.h"
@@ -7,7 +8,7 @@
 
 #include "timed.h"
 
-static inline table_t lrgst_sub_table(dyn_perf_t *self) {
+static table_t lrgst_sub_table(dyn_perf_t *self) {
     table_t max;
     memset(&max, 0, _s(max));
 
@@ -21,10 +22,10 @@ static inline table_t lrgst_sub_table(dyn_perf_t *self) {
 
 typedef struct {size_t cnt, slots, entries, items[128], freqncs[128];} sub_tbl_cnts_t;
 
-static inline  sub_tbl_cnts_t *compl_sub_table_stats(const dyn_perf_t *const self, sub_tbl_cnts_t *stats) {
-
+static sub_tbl_cnts_t *compl_sub_table_stats(const dyn_perf_t *const self, sub_tbl_cnts_t *stats)
+{
     size_t cnt = fld_cnt(self->entry_type, self->len_log2);
-    size_t *indices = fld_entrs(self->entry_type, self->len_log2, malloc(_s(*indices) * cnt));
+    size_t *const indices = fld_entrs(self->entry_type, self->len_log2, malloc(_s(*indices) * cnt));
     const table_t *table;
 
     for (stats->cnt = cnt; cnt--; stats->freqncs[table->capct]++) {
@@ -40,14 +41,15 @@ static inline  sub_tbl_cnts_t *compl_sub_table_stats(const dyn_perf_t *const sel
     return stats;
 }
 
-
-
 void test_dyn_perf(
     dyn_perf_t                *const self
     ,_t(((entry_t){}).key)    *const keys
     ,_t(((entry_t){}).item)   *const values
-    ,const unsigned long      cnt
+    ,const size_t              cnt
 ) {
+    typedef _t(*keys)   key_t;
+    typedef _t(*values) item_t;
+
     size_t index;
     const _t(*self) orignl = *self;
     static const struct {
@@ -60,7 +62,7 @@ void test_dyn_perf(
 #   define test_insert() for (index = 0; index < cnt; index++) oprtr.set(self, keys[index], values[index])
 
 #   define test_query() ({                                  \
-        _t(((entry_t){}).item) temp;                        \
+        item_t temp;                                        \
         for (index = 0; index < cnt; index++)               \
             if (comp_unlikely((temp = oprtr.get(self, keys[index])) != values[index]))   \
                 printf(                                     \
@@ -98,26 +100,16 @@ void test_dyn_perf(
         }
     };
 
-
-#   define expect(a, b) if ((a) != (b)) \
-        printf( \
-            "failure: exp: (%s) -> %'llu, got:(%s) -> %'llu\n"  \
-            ,#b                         \
-            ,(unsigned long long)(b)    \
-            ,#a                         \
-            ,(unsigned long long)(a)    \
-        ), exit(-1);
-
     size_t collsn_cnt = 0;
-    _t(keys[0]) colldn_key;
-    _t(values[0]) empty = empty_entry->item;
+    key_t  colldn_key;
+    item_t empty = empty_entry->item;
     for (index = 0; index < 10000000; index++) {
         colldn_key = hash_rand_coef(colldn_key);
         entry_t *entry = dyn_perf_entry(self, colldn_key);
         if (entry != empty_entry && entry->key != colldn_key) {// key collision
             if ((empty = dyn_perf_getitem(self, colldn_key)) != empty_entry->item) {
                 printf(
-                    "test failed!, key: %'llu other: %'llu, item: %p other: %p\n"
+                    "test failed!, key: %llu other: %llu, item: %p other: %p\n"
                     ,(unsigned long long)colldn_key
                     ,(unsigned long long)entry->key
                     ,(void *)entry->item
@@ -127,11 +119,12 @@ void test_dyn_perf(
             }
         }
 
+
     double delete_time = timed(test_del);
 
-    for (index = 0; index < cnt; index++)
-        expect(oprtr.get(self, keys[index]), empty_entry->item);
-
+    setlocale(LC_NUMERIC, "");
+    for (index = cnt; index--; assert(oprtr.get(self, keys[index]) == empty_entry->item))
+        ;
 
     printf(
         "\n\nsizeof(*self): %zu sizeof(*sub_table): %zu sizeof(entry_t): %zu, sizeof(key_t): %zu sizeof(item): %zu\n"
@@ -208,19 +201,10 @@ void test_dyn_perf(
 
     printf(
         "empty table final state {cnt: %'zu length: %'zu slots: %'lu consuming: %'zu (bytes)}\n\n"
-        ,(_t(cnt))self->cnt
-        ,(_t(cnt))dyn_perf_length(self)
-        ,({ size_t cnt = 0;
-            for (index = 1UL << self->len_log2; index--; cnt += self->slots[index].entry != empty_entry) ;
-            cnt; })
+        ,(size_t)self->cnt
+        ,(size_t)dyn_perf_length(self)
+        ,({ size_t sum = 0; for (index = dyn_perf_length(self); index--; sum += self->slots[index].entry != empty_entry) ;
+           sum; })
         ,dyn_perf_byt_consptn(self)
     );
-
-    // Release all cached objects ....
-    dyn_perf_release_alloc_blocks();
-    table_release_alloc_blocks();
-    entry_release_alloc_blocks();
-    entries_release_alloc_blocks();
-    fld_pow2_release_alloc_blocks();
-
 }
