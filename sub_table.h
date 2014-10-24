@@ -36,7 +36,7 @@ typedef struct table_t {
 alloc_recl_sign_templs(table);
 
 
-#define sub_table_length(self)     (1 << (self)->len_log2)
+#define sub_table_length(self)     (1UL << (self)->len_log2)
 //#define sub_table_entries_id(self) ((self)->len_log2)
 
 #define sub_table_rand_coef(type)
@@ -72,7 +72,7 @@ static_inline void sub_table_find_coef(
     _t(((entry_t){}).key) dest[],
     const size_t item_cnt
 ) {
-    _t(((fld_t *)NULL)->word) buff[fld_len(self->len_log2)] __attribute__((aligned(sizeof(lrgst_vect_ingtl_t))));
+    _t(((fld_t *)NULL)->word) buff[fld_len(self->len_log2)]; //__attribute__((aligned(sizeof(lrgst_vect_ingtl_t))));
     fld_t *set;
     unsigned char cnt;
 
@@ -123,7 +123,7 @@ static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *appe
     const size_t remndr = self->cnt % (_s(oprn_t)/_s(memb_t));
     const size_t key_cnt = self->cnt + (remndr ? (_s(oprn_t) - remndr) : 0);
 
-    memb_t keys[key_cnt] __attribute__((aligned(sizeof(oprn_t))));
+    memb_t keys[key_cnt]; //__attribute__((aligned(sizeof(oprn_t))));
     for (id = self->cnt; id--; keys[id] = entries[id]->key) ;
 
     _t(keys) buff;
@@ -137,6 +137,7 @@ static_inline void sub_table_rehash(table_t *self, entry_t **curr, entry_t *appe
     );
 
     self->slots = entries_pow2_new(self->len_log2);
+
     for (id = self->cnt; id--; self->slots[buff[id]] = entries[id]) ;
 }
 
