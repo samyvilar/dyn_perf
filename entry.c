@@ -6,16 +6,15 @@
 
 const entry_t *const empty_entry = &(entry_t){.key = (_t(((entry_t){}).key))-1};
 
-
+alloc_obj_tdef_tmpl(entry);
 alloc_mgt_obj(entry);
 alloc_templ(entry)
 release_tmpl(entry)
 
 inline void entry_recl(entry_t *const self) {
-    static entry_t **const prevs = (_t(prevs))&alloc_mgt(entry)._recld;
+//    if (self == empty_entry)
+//        return ;
 
-    register const int is_good = (self != empty_entry); // <<<< don't recycle empty_entry!
-
-    self->_next = is_good ? *prevs : self->_next;
-    *prevs      = is_good ?  self  : *prevs;
+    *(entry_t **)self = alloc_mgt(entry).recld;
+    alloc_mgt(entry).recld = self;
 }
