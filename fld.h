@@ -46,13 +46,13 @@ static_inline fld_t *fld_pow2_new(unsigned id) {
         return self;
     }
 
-    return comp_select(_s(wrd_t) < _s(void *),
-        calloc(
-            max(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), (_s(void *)/_s(wrd_t))),
-            _s(wrd_t)
-        ),
-        calloc(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), _s(wrd_t))
-    );
+    const size_t size = comp_select(
+        _s(wrd_t) < _s(void *),
+        umax(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), _s(void *)/_s(wrd_t)),
+        calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)])
+    ) * _s(wrd_t);
+
+    return memset(malloc(size), 0, size);
 }
 
 static_inline void fld_pow2_recl_clnd(fld_t *self, const unsigned id) {
@@ -91,7 +91,7 @@ static_inline size_t fld_cnt(fld_t *self, const unsigned char id) {
     return cnt;
 }
 
-static_inline size_t *fld_entrs(fld_t *self, const unsigned char id, size_t *dest) {
+static_inline size_t *fld_entrs(fld_t *const self, const unsigned char id, size_t *const dest) {
     const size_t len = fld_len(id);
 
     _t(self->word) word;
