@@ -8,6 +8,9 @@
 alloc_rec_templs(table);
 
 
+typedef _t(((entry_t){}).key) key_t;
+
+
 static const struct {
     const unsigned char
         initial_len_log2,
@@ -43,7 +46,7 @@ static const struct {
 
 
 table_t *table_build_2(entry_t *entry_a, entry_t *entry_b) {
-    typedef _t(entry_a->key)        memb_t;
+    typedef key_t                   memb_t;
     typedef vect_lrgst_intgl_type   oprn_t;
 
     table_t *const self = table_alloc();
@@ -71,3 +74,56 @@ table_t *table_build_2(entry_t *entry_a, entry_t *entry_b) {
 
     return self;
 }
+
+
+static_inline void sub_table_find_coef(table_t *self, hashr_t *params, key_t src[], key_t dest[], const size_t item_cnt)
+{
+    _t(((fld_t *)NULL)->word) buff[fld_len(self->len_log2)]; //__attribute__((aligned(sizeof(lrgst_vect_ingtl_t))));
+    fld_t *set;
+    unsigned char cnt;
+
+    restart:
+    set = mem_clr_align(buff, _s(buff));
+    hashes(params, (void *)src, (void *)dest, item_cnt);
+    for (cnt = self->cnt; cnt--; fld_flip(set, dest[cnt])) ;
+
+    if (fld_cnt(set, self->len_log2) == self->cnt)
+        return ;
+
+    hashr_init_coef(params, self->coef = hash_rand_coef(self->coef));
+    goto restart;
+}
+
+void sub_table_rehash(table_t *self, entry_t **curr, entry_t *append, unsigned short id) {
+    typedef lrgst_vect_ingtl_t      oprn_t;
+    typedef key_t   memb_t;
+
+    entry_t *entries[self->cnt];
+    entries[0] = append;
+    entries[1] = *curr;
+    *curr      = (void *)empty_entry;
+    entrs_coll_clr(self->slots, &entries[2], self->cnt - 2);
+    entries_pow2_recl_cleand(self->slots, id);
+
+    const size_t remndr = self->cnt % (_s(oprn_t)/_s(memb_t));
+    const size_t key_cnt = self->cnt + (remndr ? (_s(oprn_t) - remndr) : 0);
+
+    memb_t keys[key_cnt]; //__attribute__((aligned(sizeof(oprn_t))));
+    for (id = self->cnt; id--; keys[id] = entries[id]->key) ;
+
+    _t(keys) buff;
+
+    sub_table_find_coef(
+        self,
+        hashr_init(&(hashr_t){}, self->coef = hash_rand_coef(self->coef), self->irrlvnt_bits),
+        keys,
+        buff,
+        key_cnt/(_s(oprn_t)/_s(memb_t))
+    );
+
+    self->slots = entries_pow2_new(self->len_log2);
+
+    for (id = self->cnt; id--; self->slots[buff[id]] = entries[id]) ;
+}
+
+
