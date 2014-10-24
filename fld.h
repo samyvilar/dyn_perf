@@ -92,11 +92,10 @@ static_inline size_t fld_cnt(fld_t *self, const unsigned char id) {
 }
 
 static_inline size_t *fld_entrs(fld_t *const self, const unsigned char id, size_t *const dest) {
-    const size_t len = fld_len(id);
-
     _t(self->word) word;
-    size_t curr, cnt;
-    for (cnt = curr = 0; curr < len; curr++)
+    size_t curr, cnt = 0;
+
+    for (curr = fld_len(id); curr--; )
         for (word = self[curr].word; word; word &= word - (_t(word))1)
             dest[cnt++] = (curr << log2_frm_pow2[bit_sz(word)]) + bits_trlng_zrs(word);
 
