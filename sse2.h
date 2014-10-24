@@ -33,6 +33,17 @@ static_inline void sse_error_not_implemented(__m128i _, ...) {
 }
 
 #if !defined(__SSE4_1__) && !defined(__INTEL_COMPILER)
+
+    static_inline int _mm_extrt_epi8(__m128i a, const int imm) {
+        if (!imm)
+            return (char)(_mm_cvtsi128_si32(a) & 0xFF);
+
+        if (imm & 1)
+            return _mm_extract_epi16(a, imm/2) >> 8;
+
+        return (char)(_mm_extract_epi16(a, imm/2) & 0xFF);
+    }
+
     static_inline int intrsc_attrs _mm_extrt_epi32(__m128i a, const int imm) {
         switch (imm & 0b11) {
             case 0: return _mm_cvtsi128_si32(a);
@@ -67,12 +78,38 @@ static_inline void sse_error_not_implemented(__m128i _, ...) {
 #   define _mm_extrt_epi32 _mm_extract_epi32
 #   define _mm_extrt_epi64 _mm_extract_epi64
 #else
+    static_inline int       intrsc_attrs _mm_extrt_epi8(__m128i a, const int imm)  {return _mm_extract_epi8(a, imm); }
     static_inline int       intrsc_attrs _mm_extrt_epi32(__m128i a, const int imm) {return _mm_extract_epi32(a, imm);}
     static_inline long long intrsc_attrs _mm_extrt_epi64(__m128i a, const int imm) {return _mm_extract_epi64(a, imm);}
 #endif
 #endif
 
+static_inline __m128i intrsc_attrs _mm_srli_epi8(__m128i a, const int b) {
+    return _mm_and_si128(_mm_srli_epi16(a, b), _mm_set1_epi8(0xFFU >> (b & 0b111))); // 2-3 cycles ...
+}
 
+static_inline __m128i intrsc_attrs _mm_srl_epi8(__m128i a, __m128i b) {
+    return _mm_and_si128(_mm_srl_epi16(a, b), _mm_set1_epi8(0xFFU >> _mm_cvtsi128_si64(b))); // 5-7 cycles ...
+}
+
+// _mm_mullo_epi16: 3
+static_inline __m128i _mm_mullo_epi8(__m128i a, __m128i b) {
+//    return _mm_or_si128( // ~12 cycles
+//        _mm_srli_epi16(_mm_slli_epi16(_mm_mullo_epi16(a, b), 8), 8),
+//        _mm_slli_epi16(_mm_mullo_epi16(_mm_srli_epi16(a, 8), _mm_srli_epi16(b, 8)), 8)
+//    );
+
+    return _mm_unpacklo_epi8( // ~10 cycles, assuming *set* gets translated to a fast load ..
+        _mm_shuffle_epi8(
+            _mm_mullo_epi16(a, b),
+            _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 14, 12, 10, 8, 6, 4, 2, 0)
+        ),
+        _mm_shuffle_epi8(
+            _mm_mullo_epi16(_mm_srli_epi16(a, 8), _mm_srli_epi16(b, 8)),
+            _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 14, 12, 10, 8, 6, 4, 2, 0)
+        )
+    );  // ^^^^^ slight faster with -Ox when x > 0 slower with -O0
+}
 
 static_inline __m128i  intrsc_attrs _mm_mullo_epi64(__m128i a, __m128i b) { // ~14 cycles ...
     return _mm_add_epi64(
@@ -141,12 +178,14 @@ static const struct {
         .setzeros       = &_mm_setzero_si128,
 
         .brdcst = {
+            [1] = (void *)&_mm_set1_epi8,
             [2] = (void *)&_mm_set1_epi16,
             [4] = (void *)&_mm_set1_epi32,
             [8] = (void *)&_mm_set1_epi64x
         },
 
         .get = {
+            [1] = &_mm_extrt_epi8,
             [2] = &_mm_extract_epi16,
             [4] = &_mm_extrt_epi32,
             [8] = &_mm_extrt_epi64
@@ -159,12 +198,14 @@ static const struct {
         },
 
         .rshft_lgcl_imm = {
+            [1] = &_mm_srli_epi8,
             [2] = &_mm_srli_epi16,
             [4] = &_mm_srli_epi32,
             [8] = &_mm_srli_epi64
         },
 
         .rshft_lgcl = {
+            [1] = &_mm_srl_epi8,
             [2] = &_mm_srl_epi16,
             [4] = &_mm_srl_epi32,
             [8] = &_mm_srl_epi64
@@ -193,6 +234,7 @@ static const struct {
         },
 
         .mul = {
+            [1] = &_mm_mullo_epi8,
             [2] = &_mm_mullo_epi16,
             [4] = &_mm_mullo_epi32,
             [8] = &_mm_mullo_epi64
