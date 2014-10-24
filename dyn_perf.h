@@ -113,41 +113,6 @@ static_inline entry_t **dyn_perf_cln_entrs(dyn_perf_t *self, entry_t **const des
 }
 
 
-void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id);
-
-
-static_inline void _set_entry(dyn_perf_t *self, entry_t **slot, entry_t *entry){
-    *slot = entry;
-}
-
-static_inline void _cvt_to_table(dyn_perf_t *self, entry_t **slot, entry_t *entry) {
-    fld_flip(self->entry_type, slot - (_t(slot))self->slots);
-    *slot = (entry_t *)table_build_2(*slot, entry);
-}
-static_inline void _set_entry_sub_table(table_t *self, entry_t **slot, entry_t *entry) {
-    *slot = entry;
-    self->cnt++;
-}
-static_inline void _modf_sub_table(table_t *self, entry_t **slot, entry_t *entry) {
-    unsigned char upd_mask_1 = (unsigned char)(self->capct - ++self->cnt) >> (char)(CHAR_BIT - 1);
-    //            ^^^^^^^^^^ 0 if table->cnt + 1 is less than table->capct
-    //                       otherwise 1, (since msb would be set and moved to lsb) ...
-    // the following operations will only modify states on exceeded capactiy, otherwise they do nothing ....
-    self->capct        <<= upd_mask_1;
-    upd_mask_1         <<= (char)1;
-    self->irrlvnt_bits  -= upd_mask_1;
-    self->len_log2      += upd_mask_1;
-
-    sub_table_rehash(self, slot, entry, (self->len_log2 - upd_mask_1));
-}
-typedef void (*const act_t)(void *, entry_t **, entry_t *);
-typedef struct oprtns_t {const act_t empty, collsn;} oprtns_t;
-static struct {oprtns_t entry, table;} acts = {
-    .entry = {.empty = (void *)_set_entry,           .collsn = (void *)_cvt_to_table},
-    .table = {.empty = (void *)_set_entry_sub_table, .collsn = (void *)_modf_sub_table}
-};
-
-
 static_inline entry_t *dyn_perf_entry(const dyn_perf_t *const self, const _t(((entry_t) {}).key) key) {
     const _t(dyn_perf_hash(self, key)) id = dyn_perf_hash(self, key);
 

@@ -13,6 +13,42 @@
 alloc_rec_templs(dyn_perf);
 
 
+
+static_inline void _set_entry(dyn_perf_t *self, entry_t **slot, entry_t *entry){
+    *slot = entry;
+}
+
+static_inline void _cvt_to_table(dyn_perf_t *self, entry_t **slot, entry_t *entry) {
+    fld_flip(self->entry_type, slot - (_t(slot))self->slots);
+    *slot = (entry_t *)table_build_2(*slot, entry);
+}
+
+static_inline void _set_entry_sub_table(table_t *self, entry_t **slot, entry_t *entry) {
+    *slot = entry;
+    self->cnt++;
+}
+
+static_inline void _modf_sub_table(table_t *self, entry_t **slot, entry_t *entry) {
+    unsigned char upd_mask_1 = (unsigned char)(self->capct - ++self->cnt) >> (char)(CHAR_BIT - 1);
+    //            ^^^^^^^^^^ 0 if table->cnt + 1 is less than table->capct
+    //                       otherwise 1, (since msb would be set and moved to lsb) ...
+    // the following operations will only modify states on exceeded capactiy, otherwise they do nothing ....
+    self->capct        <<= upd_mask_1;
+    upd_mask_1         <<= (char)1;
+    self->irrlvnt_bits  -= upd_mask_1;
+    self->len_log2      += upd_mask_1;
+
+    sub_table_rehash(self, slot, entry, (self->len_log2 - upd_mask_1));
+}
+
+typedef void (*const act_t)(void *, entry_t **, entry_t *);
+typedef struct oprtns_t {const act_t empty, collsn;} oprtns_t;
+static struct {oprtns_t entry, table;} acts = {
+    .entry = {.empty = (void *)_set_entry,           .collsn = (void *)_cvt_to_table},
+    .table = {.empty = (void *)_set_entry_sub_table, .collsn = (void *)_modf_sub_table}
+};
+
+
 static void _dyn_perf_set_entry(dyn_perf_t *volatile self, _t(((entry_t){}).key) id, entry_t *entry) {
     oprtns_t actions;
     entry_t **other;
@@ -30,7 +66,7 @@ static void _dyn_perf_set_entry(dyn_perf_t *volatile self, _t(((entry_t){}).key)
 }
 
 
-void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
+static void dyn_perf_rebuild(dyn_perf_t *self, unsigned char prev_id)
 {
     typedef _t(((entry_t){}).key)       memb_t;
     typedef lrgst_vect_ingtl_t          oprn_t;
