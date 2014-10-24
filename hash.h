@@ -71,8 +71,7 @@ static_inline _t(((entry_t *)0)->key) hash_univ_pow2(
     const unsigned char              irlvnt_bits
 ) {
     id  *= coef;
-    id >>= irlvnt_bits;
-    return id;
+    return comp_select((_t(id))-1 > 0, id >> irlvnt_bits, (unsigned long)id >> irlvnt_bits);
 }
 
 typedef struct hashr_t {
@@ -103,10 +102,10 @@ static_inline void *hashes(
     typedef vect_lrgst_intgl_type   oprn_t;
     typedef _t(((entry_t *)0)->key) memb_t;
 
-    oprn_t (*const load)(void *)          = (_t(load))vect.lrgst.intgl.ops->load;
+    oprn_t (*const load)(void *)          = (_t(load))vect.lrgst.intgl.ops->load_align;
     oprn_t (*const mul) (oprn_t, oprn_t)  = vect.lrgst.intgl.ops->mul[_s(memb_t)];
     oprn_t (*const rshft)(oprn_t, oprn_t) = vect.lrgst.intgl.ops->rshft_lgcl[_s(memb_t)];
-    memb_t (*const store)(void *, oprn_t) = (_t(store))vect.lrgst.intgl.ops->store;
+    memb_t (*const store)(void *, oprn_t) = (_t(store))vect.lrgst.intgl.ops->store_align;
 
     while (cnt--)
         store(&dest[cnt], rshft(mul(self->coef, load(&src[cnt])), self->irrlvnt_bits));
