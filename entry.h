@@ -8,22 +8,21 @@
 
 #include "scalrs.h"
 
-typedef struct entry_t {
-    union {
-        struct entry_t *_next;
-        struct {
-#           ifndef ENTRY_KEY_T
-                unsigned long
-#           else
-                ENTRY_KEY_T
-#               undef ENTRY_KEY_T
-#           endif
+#ifndef ENTRY_KEY_T
+#   define ENTRY_KEY_T unsigned long
+#endif
 
-                key;
-            void *item;
-        };
-    };
+#ifndef ENTRY_ITEM_T
+#   define ENTRY_ITEM_T void *
+#endif
+
+typedef struct entry_t {
+    ENTRY_KEY_T  key;
+    ENTRY_ITEM_T item;
 } entry_t;
+
+#undef ENTRY_KEY_T
+#undef ENTRY_ITEM_T
 
 
 extern const entry_t *const empty_entry;
@@ -39,7 +38,7 @@ static_inline entry_t *entry_new(const _t(((entry_t){}).key) key, const _t(((ent
     return self;
 }
 
-static_inline _t(((entry_t){}).item) entry_query(entry_t * self, _t(((entry_t){}).key) key) {
+static_inline _t(((entry_t){}).item) entry_query(entry_t *self, _t(((entry_t){}).key) key) {
 
     return (self->key == key) ? self->item : empty_entry->item;
 
