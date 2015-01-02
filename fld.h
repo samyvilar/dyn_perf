@@ -5,8 +5,8 @@
 
 #include "bits.h"
 #include "comp_utils.h"
-
-#include "mem.h"
+#include "vect.h"
+#include "sse2.h"
 
 
 static const unsigned char log2_frm_pow2[] = {
@@ -18,25 +18,45 @@ static const unsigned char log2_frm_pow2[] = {
 };
 
 
-static_inline size_t calc_len_log2(const unsigned char a_log2, const unsigned char b_log2) {
+static_inline size_t calc_len_log2(const size_t a_log2, const size_t b_log2) {
 //                         ^^^^^^^^^^^^^ returns 1 << (a_log2 - b_log2) iff a_log2 > b_log2 otherwise 1.
-    return 1UL << (char)(
-        (char)(a_log2 - b_log2)
-     & ((char)(b_log2 - a_log2) >> (char)(CHAR_BIT - 1))
-    ); // ^^^^ C compilers have a tendency of upgrading operands to int when ever either operand is smaller
-
+    return 1UL << (
+        (long long)(a_log2 - b_log2)
+     & ((long long)(b_log2 - a_log2) >> (bit_sz(size_t) - 1))
+    );
 }
 
 typedef union {uword_t word;} fld_t;
 
-fld_t *cleand_flds[comp_select(_s(void *) == 8, 44, 32)]; // 1,099,511,627,776  16 bit words ...
+#define fld_null ((fld_t *)0)
 
-static_inline size_t fld_len(const unsigned char id) {
-    return calc_len_log2(id, log2_frm_pow2[bit_sz(((fld_t *)0)->word)]);
+
+extern fld_t *cleand_flds[bit_sz(void *)];
+
+static_inline size_t fld_len(const size_t id) {
+    return calc_len_log2(id, log2_frm_pow2[bit_sz(fld_null->word)]);
 }
 
-static_inline fld_t *fld_pow2_new(unsigned id) {
-    typedef _t(((fld_t *)0)->word) wrd_t;
+
+static_inline fld_t *fld_pow2_init(fld_t *self, const size_t id) {
+    typedef vect_lrgst_intgl_type packd_t;
+    typedef _t(self->word)        wrd_t;
+
+    _t(vect.lrgst.intgl.ops->store) store = vect.lrgst.intgl.ops->store;
+    packd_t zero = vect.lrgst.intgl.ops->setzeros();
+
+    static const size_t compnt_cnt = _s(packd_t)/_s(fld_null->word);
+    size_t cnt = fld_len(id), remndr;
+
+    for (remndr = cnt % compnt_cnt; remndr--; self[--cnt].word = 0) ;
+
+    for (cnt /= compnt_cnt; cnt--; store(&((packd_t *)self)[cnt], zero)) ;
+
+    return self;
+}
+
+static_inline fld_t *fld_pow2_new(size_t id) {
+    typedef _t(fld_null->word) wrd_t;
 
     if (cleand_flds[id]) {
         fld_t *self = cleand_flds[id];
@@ -46,22 +66,16 @@ static_inline fld_t *fld_pow2_new(unsigned id) {
         return self;
     }
 
-    const size_t size = comp_select(
-        _s(wrd_t) < _s(void *),
-        umax(calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)]), _s(void *)/_s(wrd_t)),
-        calc_len_log2(id, log2_frm_pow2[bit_sz(wrd_t)])
-    ) * _s(wrd_t);
-
-    return memset(malloc(size), 0, size);
+    return fld_pow2_init(malloc(fld_len(id) * _s(wrd_t)), id);
 }
 
-static_inline void fld_pow2_recl_clnd(fld_t *self, const unsigned id) {
+static_inline void fld_pow2_recl_clnd(fld_t *self, const size_t id) {
     *(fld_t **)self = cleand_flds[id];
     cleand_flds[id] = self;
 }
 
 static_inline void fld_pow2_release_alloc_blocks() {
-    unsigned char id;
+    size_t id;
     fld_t *curr, *next;
     for (id = array_cnt(cleand_flds); id--; cleand_flds[id] = NULL)
         for (curr = cleand_flds[id]; curr != NULL; curr = next) {
@@ -70,36 +84,25 @@ static_inline void fld_pow2_release_alloc_blocks() {
         }
 }
 
-
-
-static_inline void fld_flip(fld_t *self, const size_t loc) {
-    typedef _t(self[0].word) wrd_t;
-    self[loc / bit_sz(wrd_t)].word ^= (wrd_t)1 << (unsigned char)(loc % bit_sz(wrd_t));
-}
-
-static_inline _t(((fld_t){}).word) fld_get(fld_t *self, const size_t loc) {
-    typedef _t(self->word) wrd_t;
-    return self[loc / bit_sz(wrd_t)].word & ((wrd_t)1 << (unsigned char)(loc % bit_sz(wrd_t)));
-}
-
-#define fld_byt_comspt(id) (_s(((fld_t *)NULL)->word) * fld_len(id))
-
-static_inline size_t fld_cnt(fld_t *self, const unsigned char id) {
-    size_t len, cnt = 0;
-    for (len = fld_len(id); len--; cnt += bits_cnt_ones(self[len].word)) ;
+static_inline size_t fld_pow2_cnt(fld_t *self, const unsigned char id) {
+    size_t len = fld_len(id), cnt = 0;
+    while (len--)
+        cnt += bits_cnt_ones(self[len].word);
 
     return cnt;
 }
 
-static_inline size_t *fld_entrs(fld_t *const self, const unsigned char id, size_t *const dest) {
-    _t(self->word) word;
-    size_t curr, cnt = 0;
-
-    for (curr = fld_len(id); curr--; )
-        for (word = self[curr].word; word; word &= word - (_t(word))1)
-            dest[cnt++] = (curr << log2_frm_pow2[bit_sz(word)]) + bits_trlng_zrs(word);
-
-    return dest;
+static_inline void fld_flip(fld_t *self, const size_t loc) {
+    typedef _t(self[0].word) wrd_t;
+    self[loc / bit_sz(wrd_t)].word ^= (wrd_t)1 << (loc % bit_sz(wrd_t));
 }
+
+static_inline _t(fld_null->word) fld_get(fld_t *self, const size_t loc) {
+    typedef _t(self->word) wrd_t;
+    return self[loc / bit_sz(wrd_t)].word & ((wrd_t)1 << (loc % bit_sz(wrd_t)));
+}
+
+#define fld_byt_comspt(id) (_s(fld_null->word) * fld_len(id))
+
 
 #endif
