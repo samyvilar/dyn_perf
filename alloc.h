@@ -29,21 +29,21 @@ typedef struct alloc_mgt_t(id){                        \
        ,*block                                         \
        ,*curr                                          \
     ;                                                  \
-    size_t cnt;\
+    size_t cnt;                                        \
     const alloctr_t     alloc;                         \
     const de_alloctr_t  releas;                        \
 } alloc_mgt_t(id);
 
 #define alloc_mgt(id) _ ## id ## _alloc_mgt
 
-#define alloc_mgt_obj(id) static alloc_mgt_t(id) alloc_mgt(id) = {.alloc = &malloc, .releas = &free}
+#define alloc_mgt_obj(id) alloc_mgt_t(id) alloc_mgt(id) = {.alloc = &malloc, .releas = &free, .cnt = 0, .recld = NULL, .block = NULL, .curr = NULL}
 
 #define reclr(id) id ## _recl
 
 #define recl_sign_tmpl(id) void reclr(id)(t_frm_prefx(id) *const) // <<<<<<< gets signature of recycler of a type name
 
 #define recl_tmpl(id)                               \
-    inline void reclr(id)(t_frm_prefx(id) *self) {  \
+    void reclr(id)(t_frm_prefx(id) *self) {         \
         *(void **)self = alloc_mgt(id).recld;       \
         alloc_mgt(id).recld  = self;                \
     }
