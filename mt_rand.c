@@ -316,18 +316,5 @@ mt_rand_vect_tmpl(&mt_vect_64, 64)
 
 double mt_rand_vect_double_0_1() {
     typedef mt_state_t(&mt_vect_64) memb_t;
-//    the numbers between 2**52=4,503,599,627,370,496 and 2**53 9,007,199,254,740,992
-//    are exactly represantable in double precision ..
-
     return (double)(mt_rand_vect_64() >> 11) * (1.0/9007199254740992.0);
-
-//        double got = ((union {unsigned long long quad; double dbl;}){
-//        .quad = ((mt_rand_vect_64() >> 11) | 0x4330000000000000ULL)
-//    }).dbl * (2.0/9007199254740992.0);
-
-//    >>> '{0:064b}'.format(struct.unpack('Q', struct.pack('d', .5))[0])
-//    '001111111110 || 0000000000000000000000000000000000000000000000000000'
-
-//    >>> '{0:064b}'.format(struct.unpack('Q', struct.pack('d', .9999999999999999))[0])
-//    '001111111110 || 1111111111111111111111111111111111111111111111111111'
 }
