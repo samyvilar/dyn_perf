@@ -5,10 +5,11 @@
 
 #include "mt_rand.h"
 #include "scalrs.h"
+#include "comp_utils.h"
 
 #include "entry.h"
-#include "vect.h"
-#include "sse2.h"
+//#include "vect.h"
+//#include "sse2.h"
 
 
 #define MAX_PRIME_8         (unsigned char)255  // <<<< largest 8 bit prime number ...
@@ -63,56 +64,42 @@
         rand_16(),                      \
         rand_8(),                       \
         (void)0                         \
-    ) /*% max_prime(type_or_expr)*/) | (typeof(type_or_expr))1)
+    ) /*% max_prime(type_or_expr)*/) | (_t(type_or_expr))1)
 
-static_inline _t(((entry_t *)0)->key) hash_univ_pow2(
-    register _t(((entry_t *)0)->key) id,
-    const _t(((entry_t *)0)->key)    coef,
-    const unsigned char              irlvnt_bits
+#define hash_rand_coef_packd(tp_or_expr) ({             \
+    typedef vect_lrgst_intgl_type oprn_t;               \
+    typedef _t(tp_or_expr)  memb_t;                     \
+                                                        \
+    oprn_t (*const brdcst)(_t(memb_t))                  \
+        = vect.lrgst.intgl.ops->brdcst[_s(memb_t)];     \
+                                                        \
+    vect.lrgst.intgl.ops->or(                           \
+        scalr_switch_oblvs_sign_intgl(                  \
+            memb_t,                                     \
+            mt_rand_packd_temprd_bits_64(),             \
+            mt_rand_packd_temprd_bits_32(),             \
+            mt_rand_packd_temprd_bits_32(),             \
+            mt_rand_packd_temprd_bits_32(),             \
+            (void)0                                     \
+        ),                                              \
+        brdcst(1)                                       \
+    ); })
+
+
+static_inline _t(entry_null->key) hash_univ_pow2(
+    _t(entry_null->key) id,
+    const _t(entry_null->key) coef,
+    const unsigned irlvnt_bits
 ) {
-    id  *= coef;
-    return comp_select((_t(id))-1 > 0, id >> irlvnt_bits, (unsigned long)id >> irlvnt_bits);
+    id *= coef;
+    switch (_s(id)) {
+        case _s(char):      return (unsigned char)id        >> irlvnt_bits;
+        case _s(short):     return (unsigned short)id       >> irlvnt_bits;
+        case _s(int):       return (unsigned int)id         >> irlvnt_bits;
+        case _s(long long): return (unsigned long long)id   >> irlvnt_bits;
+        default: assert(0);
+    }
+    assert(0);
 }
-
-typedef struct hashr_t {
-    vect_lrgst_intgl_type
-        coef, irrlvnt_bits;
-} hashr_t;
-
-static_inline void hashr_init_coef(hashr_t *self, _t((entry_t){}.key) coef) {
-    self->coef = ((vect_lrgst_intgl_type (*)(_t(coef)))vect.lrgst.intgl.ops->brdcst[_s(coef)])(coef);
-}
-
-
-static_inline hashr_t *hashr_init(hashr_t *self, _t((entry_t){}.key) coef, unsigned char irrlvnt_bits) {
-    hashr_init_coef(self, coef);
-
-    self->irrlvnt_bits = ((vect_lrgst_intgl_type (*)(unsigned long))vect.lrgst.intgl.ops->brdcst[_s(long)])(
-        (unsigned long)irrlvnt_bits
-    );
-    return self;
-}
-
-static_inline void *hashes(
-    hashr_t               *self,
-    vect_lrgst_intgl_type *src,
-    vect_lrgst_intgl_type *dest,
-    size_t                 cnt
-) {
-    typedef vect_lrgst_intgl_type   oprn_t;
-    typedef _t(((entry_t *)0)->key) memb_t;
-
-    oprn_t (*const load)(void *)          = (_t(load))vect.lrgst.intgl.ops->load_align;
-    oprn_t (*const mul) (oprn_t, oprn_t)  = vect.lrgst.intgl.ops->mul[_s(memb_t)];
-    oprn_t (*const rshft)(oprn_t, oprn_t) = vect.lrgst.intgl.ops->rshft_lgcl[_s(memb_t)];
-    memb_t (*const store)(void *, oprn_t) = (_t(store))vect.lrgst.intgl.ops->store_align;
-
-    while (cnt--)
-        store(&dest[cnt], rshft(mul(self->coef, load(&src[cnt])), self->irrlvnt_bits));
-
-    return dest;
-}
-
-
 
 #endif

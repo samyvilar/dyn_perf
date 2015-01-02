@@ -1,9 +1,8 @@
 
 
-#include "comp_utils.h"
 #include "entry.h"
-#include "alloc.h"
 
-const entry_t *const empty_entry = &(entry_t){.key = (_t(((entry_t){}).key))-1};
+entry_t empty_entry_obj = {.next = &empty_entry_obj, .key  = (_t(entry_null->key))-1, .item = NULL};
+entry_t *const empty_entry = &empty_entry_obj;
 
 alloc_rec_templs(entry);

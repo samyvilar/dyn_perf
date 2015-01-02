@@ -29,41 +29,41 @@
 
 #define t_bit_name(_kind, _bit_size) _kind ## _bit_size ## bit
 
-#define sint1byt_t    signed      char
-#define uint1byt_t    unsigned    char
+//#define sint1byt_t    signed      char
+//#define uint1byt_t    unsigned    char
 #define sint8bit_t    signed      char
 #define uint8bit_t    unsigned    char
 
-#define sint2byt_t    signed      short
-#define uint2byt_t    unsigned    short
+//#define sint2byt_t    signed      short
+//#define uint2byt_t    unsigned    short
 #define sint16bit_t   signed      short
 #define uint16bit_t   unsigned    short
 
-#define sint4byt_t    signed      int
-#define uint4byt_t    unsigned    int
+//#define sint4byt_t    signed      int
+//#define uint4byt_t    unsigned    int
 #define sint32bit_t   signed      int
 #define uint32bit_t   unsigned    int
 
-#define sint8byt_t    signed      long long int
-#define uint8byt_t    unsigned    long long int
-
+//#define sint8byt_t    signed      long long int
+//#define uint8byt_t    unsigned    long long int
 #define sint64bit_t   signed      long long int
 #define uint64bit_t   unsigned    long long int
 
 #define SCALR_INTGL_TYPE_CNT 8
 
-#define sint_byt_t(_byt_mag) sint ## _byt_mag ## byt ## _t    // get signed integral type by byte size
-#define uint_byt_t(_byt_mag) uint ## _byt_mag ## byt ## _t   // get unsigned integral type with with _byt_mag bytes ..
+//#define sint_byt_t(_byt_mag) sint ## _byt_mag ## byt ## _t    // get signed integral type by byte size
+//#define uint_byt_t(_byt_mag) uint ## _byt_mag ## byt ## _t   // get unsigned integral type with with _byt_mag bytes ..
 
 #define sint_bit_t(_bit_mag) sint ## _bit_mag ## bit ## _t   // get signed integral type by bit size
 #define uint_bit_t(_bit_mag) uint ## _bit_mag ## bit ## _t   // get unsigned integral by bit size
 
-#define flt4byt_t    float
+//#define flt4byt_t    float
+//#define flt8byt_t    double
+
 #define flt32bit_t   float
-#define flt8byt_t    double
 #define flt64bit_t   double
 
-#define flt_byt_t(_byt_mag) flt ## _byt_mag ## byt ## _t
+//#define flt_byt_t(_byt_mag) flt ## _byt_mag ## byt ## _t
 #define flt_bit_t(_bit_mag) flt ## _bit_mag ## bit ## _t
 
 #define t_from_kind_bit_size(_kind, _bit_size) _kind ## _bit_t(_bit_size)
@@ -93,7 +93,7 @@
 #define t_is_sint32bit(type)  comp_t_eq(type, sint_bit_t(32))
 #define t_is_sint64bit(type)  (comp_t_eq(type, sint_bit_t(64)) || comp_t_eq(type, signed long int))
 
-#define _t_is_int_t(type, int_t_kind)  (  \
+#define _t_is_int_t(type, int_t_kind)  (     \
     comp_t_eq(type, int_t_kind(8))           \
  || comp_t_eq(type, int_t_kind(16))          \
  || comp_t_eq(type, int_t_kind(32))          \
@@ -131,9 +131,8 @@
 
 
 #define _interp(e, _from_name, _to_name) (((union {_from_name _from; _to_name _to;}){(e)})._to)
-// arithmetic right shift (extending sign bit)
 
-
+#define macro_apply(f, args...) f(args)
 // apply bit operations on scalar expression, if floats reinterpret words as intgl scalars apply bit operation
 // and reinterpret result back as float type ...
 #define scalr_bit_oper(a, oper, b, _flt_to_intl_kind)       \
@@ -193,7 +192,7 @@
         ((_intgl_kind(32))(shf_sclr_a)    shift_oper (_mb)),            \
         ((_intgl_kind(16))(shf_sclr_a)    shift_oper (_mb)),            \
         ((_intgl_kind(8))(shf_sclr_a)     shift_oper (_mb)),            \
-        (void)0                                     \
+        (void)0                                                         \
     )
 
 
@@ -213,7 +212,7 @@
 #define scalr_sub(a, b) ((a) - (b))
 #define scalr_mul(a, b) ((a) * (b))
 
-#define scalr_log2 cnt_leadn_zrs
+#define scalr_log2        cnt_leadn_zrs
 #define scalr_mul_by_pow2 scalr_lshift
 #define scalr_div_by_pow2 scalr_rshift
 
@@ -401,16 +400,16 @@
 
 
 static_inline uword_t abs_twos_cmplnt(const word_t a) {  // (branchless 3 instructions) take absolute value of a word using twos complement ..
-    const _t(a) sign_ones = scalr_sign_ext(a);
+    const _t(a) sign_ones = a >> (bit_sz(a) - 1);
     return (a ^ sign_ones) - sign_ones; // <<<< if a < 0 then ((a ^ -1) - -1) -> (~a + 1) else ((a ^ 0) - 0) -> (a)
 }
 
 static_inline word_t min(const word_t a, const word_t b) { // 5 (branchless) instructions ...
-    return b ^ ((b ^ a) & scalr_sign_ext(a - b));
+    return b ^ ((b ^ a) & ((a - b) >> (bit_sz(a - b) - 1)));
     //           b ^ a if a < b bc ^^ -> 0b11111 if a < b else 0 implying -> b <= a
 }
 static_inline word_t max(const word_t a, const word_t b) {
-    return a ^ ((b ^ a) & scalr_sign_ext(a - b));
+    return a ^ ((b ^ a) & ((a - b) >> (bit_sz(a - b) - 1)));
 }
 
 

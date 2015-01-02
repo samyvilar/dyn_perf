@@ -7,33 +7,33 @@
 //
 
 #include <stdio.h>
-#include <locale.h>
 
-#include "dyn_perf.h"
-#include "entry.h"
+#include "comp_utils.h"
 #include "mt_rand.h"
-#include "scalrs.h"
+#include "dyn_perf.h"
 
-int key_diff(const void *a, const void *b) {
-    return ((*(entry_t **)a)->key < (*(entry_t **)b)->key) ? -1 : 1;
-}
+
+int key_diff(const void *a, const void *b)
+{   return ((*(entry_t **)a)->key < (*(entry_t **)b)->key) ? -1 : 1;    }
 
 void set_random_keys_and_values(
-    _t(((entry_t){}).key)  *keys,
-    _t(((entry_t){}).item) *values,
+    _t(entry_null->key)  *keys,
+    _t(entry_null->item) *values,
     const unsigned long cnt
 ) {
     typedef _t(*keys) key_t;
 
-    entry_t *const entries = malloc(_s(*entries) * cnt);
-    entry_t **const sorted_entries = malloc(_s(entries) * cnt);
+    assert(cnt <= (key_t)-1);
+
+    entry_t
+        *const entries         = malloc(_s(*entries) * cnt),
+        **const sorted_entries = malloc(_s(entries)  * cnt);
     size_t index;
 
     static unsigned long (*const rand)() = (void *)&rand_64;
-
-    assert(cnt <= (key_t)-1);
     for (index = 0; index < cnt; index++) {
         entries[index] = (entry_t){.key = rand(), .item = (_t(*values))rand()};
+//        entries[index] = (entry_t){.key = index, .item = (_t(*values))rand()};
         sorted_entries[index] = &entries[index];
     }
 
@@ -44,9 +44,9 @@ void set_random_keys_and_values(
 
     struct {key_t low, high;} *const avlbl_ranges = malloc((cnt + 2) * _s(*avlbl_ranges));
 
-    if (sorted_entries[0]->key)
+    if (0 != sorted_entries[0]->key)
         avlbl_ranges[0] = (_t(*avlbl_ranges)){.low = 0, .high = sorted_entries[0]->key};
-   else
+    else
         avlbl_ranges[0].low = avlbl_ranges[0].high = 0;
 
     for (index = 0; index < cnt; index = curr) {
@@ -93,15 +93,16 @@ void set_random_keys_and_values(
     free(avlbl_ranges);
 }
 
+
 int main()
 {
-    typedef _t(((entry_t){}).key)   key_t;
-    typedef _t(((entry_t){}).item)  item_t;
+    typedef _t(entry_null->key)   key_t;
+    typedef _t(entry_null->item)  item_t;
 
     const size_t test_size = umin(10000000, (key_t)-1UL);
 
-    key_t  *keys  = malloc(test_size * sizeof(*keys));
-    item_t *items = malloc(test_size * sizeof(*items));
+    key_t  *keys  = malloc(test_size * _s(*keys));
+    item_t *items = malloc(test_size * _s(*items));
 
     set_random_keys_and_values(keys, items, test_size);
 

@@ -1,22 +1,23 @@
 
 #include <stdio.h>
+#include <string.h>
 #include <locale.h>
 
 #include "dyn_perf.h"
-#include "sub_table.h"
-#include "entry.h"
 
 #include "timed.h"
 
+typedef _t(*dyn_perf_null->slots->table) table_t;
+
 static table_t lrgst_sub_table(dyn_perf_t *self) {
-    table_t max;
-    memset(&max, 0, _s(max));
+    table_t max = {.len_log2 = 0};
 
-    size_t curr;
-    for (curr = 0; curr < dyn_perf_length(self); curr++)
+    size_t curr = length(self);
+    while (curr--)
         if (dyn_perf_entry_is_table(self, curr) && (self->slots[curr].table->len_log2 > max.len_log2))
-            max = *(self->slots[curr].table);
+            max = *self->slots[curr].table;
 
+    max.len_log2 = max.len_log2 ? max.len_log2 : 64; // <<<< if length is zero then set to 64 so (1 << 64) == 0
     return max;
 }
 
@@ -24,29 +25,28 @@ typedef struct {size_t cnt, slots, entries, items[128], freqncs[128];} sub_tbl_c
 
 static sub_tbl_cnts_t *compl_sub_table_stats(const dyn_perf_t *const self, sub_tbl_cnts_t *stats)
 {
-    size_t cnt = fld_cnt(self->entry_type, self->len_log2);
-    size_t *const indices = fld_entrs(self->entry_type, self->len_log2, malloc(_s(*indices) * cnt));
-    const table_t *table;
+    _t(self->entry_type->word) set;
+    size_t len = fld_len(self->len_log2);
+    _t(dyn_perf_null->slots) block = &self->slots[len << log2_frm_pow2[bit_sz(set)]];
 
-    for (stats->cnt = cnt; cnt--; stats->freqncs[table->capct]++) {
-        table = self->slots[indices[cnt]].table;
+    while (len--) {
+        block -= bit_sz(set);
+        for (set = self->entry_type[len].word; 0 != set; set &= set - (_t(set))1) {
+            stats->cnt++;
 
-        stats->slots   += sub_table_length(table);
-        stats->entries += table->cnt;
+            _t(self->slots->table) table = block[bits_trlng_zrs(set)].table;
 
-        stats->items[table->capct] += table->cnt;
+            stats->slots += length(table);
+            stats->entries += table->cnt;
+
+            stats->items[sub_table_capct(table)] += table->cnt;
+            stats->freqncs[sub_table_capct(table)]++;
+        }
     }
-
-    free(indices);
     return stats;
 }
 
-void test_dyn_perf(
-    dyn_perf_t                *const self
-    ,_t(((entry_t){}).key)    *const keys
-    ,_t(((entry_t){}).item)   *const values
-    ,const size_t              cnt
-) {
+void test_dyn_perf(dyn_perf_t *const self, _t(entry_null->key) *const keys, _t(entry_null->item) *const values, const size_t cnt) {
     typedef _t(*keys)   key_t;
     typedef _t(*values) item_t;
 
@@ -59,15 +59,15 @@ void test_dyn_perf(
     } oprtr = {.set = dyn_perf_setitem, .get = dyn_perf_getitem, .rem = dyn_perf_delitem};
 
 
-#   define test_insert() for (index = 0; index < cnt; index++) oprtr.set(self, keys[index], values[index])
+#   define test_insert() for (index = 0; index < cnt; index++) oprtr.set(self, keys[index], values[index]);
 
 #   define test_query() ({                                  \
         item_t temp;                                        \
         for (index = 0; index < cnt; index++)               \
-            if (comp_unlikely((temp = oprtr.get(self, keys[index])) != values[index]))   \
+            if ((temp = oprtr.get(self, keys[index])) != values[index])   \
                 printf(                                     \
                     "Bad Query : "                          \
-                    "entries[%llu] exp: %p got: %p "        \
+                    "entries[%'llu] exp: %p got: %p "        \
                     "key: %llu\n"                           \
                     ,(unsigned long long)index              \
                     ,(void *)(unsigned long)values[index]   \
@@ -81,6 +81,29 @@ void test_dyn_perf(
     double insert_time  = timed(test_insert);
     double query_time   = timed(test_query);
 
+    size_t curr = 0, max_sqntl_empty_slots = 0, max_sqntl_non_empty_slots = 0;
+    for (index = 0; index < length(self); index++)
+        if (self->slots[index].entry == empty_entry)
+            curr++;
+        else if (curr > max_sqntl_empty_slots) {
+            max_sqntl_empty_slots = curr;
+            curr = 0;
+        } else
+            curr = 0;
+    printf("max_sqntl_empty_slots: %zu\n", max_sqntl_empty_slots);
+
+    for (index = 0; index < length(self); index++)
+        if (self->slots[index].entry != empty_entry)
+            curr++;
+        else if (curr > max_sqntl_non_empty_slots) {
+            max_sqntl_non_empty_slots = curr;
+            curr = 0;
+        } else
+            curr = 0;
+    printf("max_sqntl_non_empty_slots: %zu\n", max_sqntl_non_empty_slots);
+
+
+
     table_t max_sub_tbl = lrgst_sub_table(self);
     sub_tbl_cnts_t *sub_table_stats = compl_sub_table_stats(self, memset(&(sub_tbl_cnts_t){}, 0, _s(sub_tbl_cnts_t)));
 
@@ -89,35 +112,50 @@ void test_dyn_perf(
         struct {size_t length, cnt, capct;} sub_table;
         struct {size_t items, slots, min;} capct;
     } max = {
-        .length      = dyn_perf_length(self),
+        .length      = length(self),
         .byte_usage  = dyn_perf_byt_consptn(self),
         .cnt         = self->cnt,
         .capct       = {.items = dyn_perf_capct(self), .min = dyn_perf_thrshld(self)},
         .sub_table   = {
-            .length = max_sub_tbl.len_log2 ? sub_table_length(&max_sub_tbl) : 0,
+            .length = length(&max_sub_tbl),
             .cnt    = max_sub_tbl.cnt,
-            .capct  = max_sub_tbl.capct
+            .capct  = sub_table_capct(&max_sub_tbl)
         }
     };
 
+
     size_t collsn_cnt = 0;
-    key_t  colldn_key;
-    item_t empty = empty_entry->item;
     for (index = 0; index < 10000000; index++) {
-        colldn_key = hash_rand_coef(colldn_key);
-        entry_t *entry = dyn_perf_entry(self, colldn_key);
-        if (entry != empty_entry && entry->key != colldn_key) {// key collision
-            if ((empty = dyn_perf_getitem(self, colldn_key)) != empty_entry->item) {
-                printf(
-                    "test failed!, key: %llu other: %llu, item: %p other: %p\n"
-                    ,(unsigned long long)colldn_key
-                    ,(unsigned long long)entry->key
-                    ,(void *)entry->item
-                    ,(void *)empty
-                ), exit(-1);
-                } else collsn_cnt++;
+        const key_t colldn_key = hash_rand_coef(colldn_key);
+
+        dyn_perf_packd_ids_t ids;
+        dyn_perf_hashes(self, colldn_key, &ids);
+
+        size_t indx;
+        _t(self->slots[0]) *slot = NULL;
+        for (indx = 0; indx < array_cnt(ids.memb); indx++) {
+            slot = &self->slots[ids.memb[indx]];
+            if (dyn_perf_entry_is_table(self, ids.memb[indx]))
+                slot = (void *) &slot->table->slots[hash(slot->table, colldn_key)];
+            if (slot->entry->next->key == colldn_key) {
+                slot = NULL;
+                break ;
             }
         }
+
+        if (slot) {
+            if (dyn_perf_getitem(self, colldn_key) != empty_entry->item) {
+                printf( // ^^^^^ check getitem returns empty_entry item on key collision.
+                    "test failed!, key: %llu other: %llu, item: %p other: %p\n"
+                    ,(unsigned long long)colldn_key
+                    ,(unsigned long long)slot->entry->next->key
+                    ,slot->entry->next->item
+                    ,dyn_perf_getitem(self, colldn_key)
+                ), exit(-1);
+            } else
+                collsn_cnt++;
+        }
+    }
 
 
     double delete_time = timed(test_del);
@@ -137,7 +175,7 @@ void test_dyn_perf(
     printf(
         "Initial cnt: %'zu length: %'zu consuming: %zu (bytes)\n"
         ,(size_t)orignl.cnt
-        ,(size_t)dyn_perf_length(&orignl)
+        ,(size_t)length(&orignl)
         ,dyn_perf_byt_consptn(self)
     );
     printf(
@@ -155,7 +193,7 @@ void test_dyn_perf(
     );
     printf("tested %'zu random non-present colliding keys\n", collsn_cnt);
     printf(
-        "largest sub table: items (cnt %'zu, capct %'zu) slots cnt %'zu\n"
+        "largest sub table: items (cnt %'zu, sub_table_capct %'zu) slots cnt %'zu\n"
         ,max.sub_table.cnt
         ,max.sub_table.capct
         ,max.sub_table.length
@@ -172,12 +210,12 @@ void test_dyn_perf(
     for (printf("\tdistributions: \n"), (index = 0); index < array_cnt(sub_table_stats->freqncs); index++)
         if (sub_table_stats->freqncs[index])
             printf(
-                "\t\tcapct: %'zu cnt: %'zu %.2f%% items: %'zu %.4f%%\n"
+                "\t\tsub_table_capct: %'zu cnt: %'zu %.2f%% items: %'zu %.4f%%\n"
                 ,index
                 ,sub_table_stats->freqncs[index]
                 ,(sub_table_stats->freqncs[index]/(double) sub_table_stats->cnt) * 100
                 ,sub_table_stats->items[index]
-                ,sub_table_stats->items[index]/(double) max.cnt
+                ,(sub_table_stats->items[index]/(double) max.cnt) * 100
         );
 
     printf(
@@ -193,17 +231,17 @@ void test_dyn_perf(
         ,delete_time
     );
     printf(
-        "rates (items/sec) {insert %'.2f query rate: %'.2f delete rates: %'.2f}\n"
-        ,max.cnt/insert_time
-        ,max.cnt/query_time
-        ,max.cnt/delete_time
+        "rates (items/sec) {insert %'i query rate: %'i delete rates: %'i}\n"
+        ,(int)(max.cnt/insert_time)
+        ,(int)(max.cnt/query_time)
+        ,(int)(max.cnt/delete_time)
     );
 
     printf(
         "empty table final state {cnt: %'zu length: %'zu slots: %'lu consuming: %'zu (bytes)}\n\n"
         ,(size_t)self->cnt
-        ,(size_t)dyn_perf_length(self)
-        ,({ size_t sum = 0; for (index = dyn_perf_length(self); index--; sum += self->slots[index].entry != empty_entry) ;
+        ,(size_t)length(self)
+        ,({ size_t sum = 0; for (index = length(self); index--; sum += self->slots[index].entry != empty_entry) ;
            sum; })
         ,dyn_perf_byt_consptn(self)
     );
